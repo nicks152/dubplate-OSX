@@ -110,9 +110,7 @@ struct PhoneSettingsScreen: View {
 
             Section("Downloads") {
                 Toggle("Download over cellular", isOn: $settings.allowsCellularDownloads)
-                Toggle("Keep recently played offline", isOn: $settings.keepsRecentlyPlayedOffline)
-                LabeledContent("Quality", value: "Original")
-                Text(settings.downloadQualityDescription)
+                Text("An album is often more than a gigabyte. With this off, Dubplate waits for Wi-Fi.")
                     .font(DubplateType.metadata)
                     .foregroundStyle(DubplateColor.tertiaryText)
             }
@@ -136,6 +134,9 @@ struct PhoneSettingsScreen: View {
 
             Section {
                 LabeledContent("Version", value: appVersion)
+                Text(DubplateSettings.audioPolicy)
+                    .font(DubplateType.metadata)
+                    .foregroundStyle(DubplateColor.tertiaryText)
                 Text("Dubplate keeps your unreleased music private. Nothing leaves your devices except through your own iCloud account.")
                     .font(DubplateType.metadata)
                     .foregroundStyle(DubplateColor.tertiaryText)

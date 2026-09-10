@@ -25,6 +25,10 @@ public final class AppServices {
 
     /// Set when the store had to fall back, so the interface can explain once.
     public private(set) var startupNotice: DubplateError?
+    /// One line about what the last drop did, shown briefly and then forgotten.
+    public var lastImportSummary: String?
+    /// Set when a download was refused because the switch says not on cellular.
+    public var downloadBlockedByCellular = false
 
     public init(
         container: ModelContainer,
@@ -55,6 +59,27 @@ public final class AppServices {
         player.didStartRelease = { [weak self] releaseID in
             guard let self, let release = library.release(id: releaseID) else { return }
             library.markPlayed(release: release)
+        }
+        player.needsDownload = { [weak self] item in
+            guard let self else { return }
+            Task { await fetchAndResume(item) }
+        }
+    }
+
+    /// Fetches the one file playback is waiting on, then lets it continue.
+    private func fetchAndResume(_ item: PlaybackQueueItem) async {
+        guard sync.canDownloadNow(allowsCellular: settings.allowsCellularDownloads) else {
+            player.abandonPendingItem()
+            return
+        }
+        await sync.download(assetIDs: [item.assetID])
+        if let release = library.release(id: item.releaseID) {
+            MediaAvailability.refresh(release, using: mediaStore)
+        }
+        if mediaStore.exists(relativePath: item.relativePath) {
+            player.resumeAfterDownload()
+        } else {
+            player.abandonPendingItem()
         }
     }
 
@@ -121,7 +146,7 @@ public final class AppServices {
 
     /// Plays a whole release from the top.
     public func play(release: Release, startingAt track: Track? = nil, shuffled: Bool = false) {
-        LibraryRepair.repair(release, in: container.mainContext)
+        open(release: release)
         let items = QueueBuilder.items(for: release)
         guard !items.isEmpty else { return }
         let index = track.flatMap { target in items.firstIndex { $0.trackID == target.id } } ?? 0
@@ -134,15 +159,45 @@ public final class AppServices {
         player.play(item)
     }
 
-    /// Plays a specific version of the track that is already playing, keeping the
-    /// position, so two mixes can be compared at the same moment.
+    /// Plays a specific version, keeping the position where it makes sense.
+    ///
+    /// Auditioning a mix of track 8 while the album runs must not throw the album
+    /// away — which is what replacing the queue with a single item did. If the track
+    /// is already in the queue it is swapped in place and jumped to; only a track
+    /// that is not part of what is playing starts a new queue.
     public func audition(version: TrackVersion, of track: Track) {
         guard let item = QueueBuilder.item(for: track, version: version) else { return }
+
         if player.currentItem?.trackID == track.id {
             player.switchToVersion(item)
-        } else {
-            player.play(item)
+            return
         }
+        if let existing = player.queue.items.first(where: { $0.trackID == track.id }) {
+            player.updateQueuedItem(item, replacingID: existing.id)
+            player.skip(to: item)
+            return
+        }
+        if let release = track.release {
+            play(release: release, startingAt: track)
+            player.switchToVersion(item, keepingPosition: false)
+            return
+        }
+        player.play(item)
+    }
+
+    /// Reports what a drop actually did. Silence after an import is what makes a
+    /// re-dropped bounce indistinguishable from data loss.
+    public func report(_ outcome: ImportOutcome, trackTitle: String? = nil) {
+        let summary = outcome.summary(trackTitle: trackTitle)
+        guard !summary.isEmpty, summary != "Nothing to add" || !outcome.failures.isEmpty else {
+            lastImportSummary = outcome.isEmpty ? "Nothing new in that drop" : summary
+            return
+        }
+        lastImportSummary = summary
+    }
+
+    public func clearImportSummary() {
+        lastImportSummary = nil
     }
 
     /// After an import: hand the new files to sync and start measuring them.
@@ -163,16 +218,80 @@ public final class AppServices {
 
     // MARK: - Offline
 
-    /// Brings every current version of a release onto this device.
-    public func download(release: Release) async {
-        let assets = release.orderedTracks.compactMap(\.currentAsset)
+    /// Brings a release onto this device.
+    ///
+    /// Every version, not only the current one: comparing two mixes in the car is
+    /// most of why the phone exists, and a previous mix that is still in iCloud
+    /// cannot be compared to anything.
+    public func download(release: Release, currentVersionsOnly: Bool = false) async {
+        guard sync.canDownloadNow(allowsCellular: settings.allowsCellularDownloads) else {
+            downloadBlockedByCellular = true
+            return
+        }
+        var assets: [AudioAsset] = []
+        for track in release.orderedTracks {
+            if currentVersionsOnly {
+                if let asset = track.currentAsset { assets.append(asset) }
+            } else {
+                assets.append(contentsOf: (track.versions ?? []).compactMap(\.audioAsset))
+            }
+        }
         var ids = assets.map(\.id)
         if let artworkAsset = release.artwork { ids.append(artworkAsset.id) }
         for asset in assets where asset.availability == .cloudOnly {
-            asset.availability = .downloading
+            asset.transferState = .downloading
         }
-        try? container.mainContext.save()
         await sync.download(assetIDs: ids)
+        MediaAvailability.refresh(release, using: mediaStore)
+    }
+
+    /// Deletes a release and clears the same bytes out of iCloud.
+    public func delete(release: Release) {
+        let removed = library.delete(release: release)
+        artwork.invalidateAll()
+        guard !removed.isEmpty else { return }
+        Task { await sync.forget(assetIDs: removed) }
+    }
+
+    /// Deletes one track and everything under it, clearing iCloud too.
+    public func delete(track: Track) {
+        let removed = library.delete(track: track)
+        guard !removed.isEmpty else { return }
+        Task { await sync.forget(assetIDs: removed) }
+    }
+
+    /// Total bytes a release would take to hold offline.
+    public func downloadSize(of release: Release, currentVersionsOnly: Bool = false) -> Int64 {
+        release.orderedTracks.reduce(0) { total, track in
+            if currentVersionsOnly {
+                return total + (track.currentAsset?.fileSize ?? 0)
+            }
+            return total + (track.versions ?? []).reduce(0) { $0 + ($1.audioAsset?.fileSize ?? 0) }
+        }
+    }
+
+    /// Opens a release: repairs it after any merge, works out what is actually here,
+    /// and — on a device that is not the one the record was made on — starts
+    /// fetching what is missing without being asked.
+    ///
+    /// This is what "I made it on the Mac and it was on my phone" has to mean.
+    public func open(release: Release) {
+        LibraryRepair.repair(release, in: container.mainContext)
+        MediaAvailability.refresh(release, using: mediaStore)
+
+        let missing = MediaAvailability.missingAssetIDs(for: release, using: mediaStore)
+        guard !missing.isEmpty,
+              sync.canDownloadNow(allowsCellular: settings.allowsCellularDownloads)
+        else {
+            return
+        }
+        for track in release.orderedTracks {
+            track.currentAsset?.transferState = .downloading
+        }
+        Task {
+            await sync.download(assetIDs: missing)
+            MediaAvailability.refresh(release, using: mediaStore)
+        }
     }
 
     /// Frees the space a release takes on this device, leaving iCloud alone.

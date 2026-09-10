@@ -8,6 +8,8 @@ public struct IngestedFile: Sendable {
     public var fileSize: Int64
     public var checksum: String
     public var info: AudioFileInfo
+    /// The folder the file was dragged from, kept for display.
+    public var sourceFolder: String?
 
     public init(
         assetID: UUID,
@@ -15,7 +17,8 @@ public struct IngestedFile: Sendable {
         originalFilename: String,
         fileSize: Int64,
         checksum: String,
-        info: AudioFileInfo
+        info: AudioFileInfo,
+        sourceFolder: String? = nil
     ) {
         self.assetID = assetID
         self.relativePath = relativePath
@@ -23,6 +26,7 @@ public struct IngestedFile: Sendable {
         self.fileSize = fileSize
         self.checksum = checksum
         self.info = info
+        self.sourceFolder = sourceFolder
     }
 }
 
@@ -61,7 +65,8 @@ public actor MediaIngestor {
                 originalFilename: source.lastPathComponent,
                 fileSize: result.fileSize,
                 checksum: checksum,
-                info: info
+                info: info,
+                sourceFolder: source.deletingLastPathComponent().lastPathComponent
             )
         } catch {
             // The bytes are safely stored; only reading them failed. Keep the file

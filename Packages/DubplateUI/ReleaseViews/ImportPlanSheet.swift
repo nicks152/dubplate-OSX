@@ -142,7 +142,7 @@ public struct ImportPlanSheet: View {
         switch plan.orderingSignal {
         case .filenameNumbers: return "Ordered by the numbers in the filenames"
         case .dropOrder: return "Ordered the way you dropped them"
-        case .filename: return "Ordered by filename"
+        case .filename: return "Ordered by filename — drag to re-sequence"
         }
     }
 

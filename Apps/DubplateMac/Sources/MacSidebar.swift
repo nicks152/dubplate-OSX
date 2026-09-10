@@ -12,9 +12,11 @@ struct MacSidebar: View {
     @Binding var section: LibrarySection
     @Binding var isShowingNewRelease: Bool
 
+    @Environment(AppServices.self) private var services
     @Environment(LibraryStore.self) private var library
     @Environment(PlayerController.self) private var player
     @Query(sort: \Release.updatedAt, order: .reverse) private var releases: [Release]
+    @State private var releaseToDelete: Release?
 
     var body: some View {
         List(selection: selectionBinding) {
@@ -52,6 +54,31 @@ struct MacSidebar: View {
             .padding(DubplateLayout.s)
             .keyboardShortcut("n", modifiers: .command)
         }
+        // Deleting a record destroys every mix in it. It is not a menu item you
+        // walk past on the way to something else.
+        .confirmationDialog(
+            deletePrompt,
+            isPresented: Binding(get: { releaseToDelete != nil }, set: { if !$0 { releaseToDelete = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button("Delete Release", role: .destructive) {
+                guard let release = releaseToDelete else { return }
+                if case .release(let id) = section, id == release.id {
+                    section = .albums
+                }
+                services.delete(release: release)
+                releaseToDelete = nil
+            }
+            Button("Cancel", role: .cancel) { releaseToDelete = nil }
+        } message: {
+            Text("Every mix of every track leaves this Mac and your iCloud. This can’t be undone.")
+        }
+    }
+
+    private var deletePrompt: String {
+        guard let release = releaseToDelete else { return "" }
+        let mixes = release.orderedTracks.reduce(0) { $0 + $1.versionCount }
+        return "Delete “\(release.title.isEmpty ? "Untitled" : release.title)” — \(release.trackCount) tracks, \(mixes) mixes?"
     }
 
     private var selectionBinding: Binding<LibrarySection?> {
@@ -83,16 +110,10 @@ struct MacSidebar: View {
         }
         .tag(LibrarySection.release(release.id))
         .contextMenu {
-            Button("Play") {
-                section = .release(release.id)
-            }
+            Button("Play") { services.play(release: release) }
+            Button("Open") { section = .release(release.id) }
             Divider()
-            Button("Delete Release", role: .destructive) {
-                if case .release(let id) = section, id == release.id {
-                    section = .albums
-                }
-                library.delete(release: release)
-            }
+            Button("Delete Release…", role: .destructive) { releaseToDelete = release }
         }
     }
 }

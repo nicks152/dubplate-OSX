@@ -161,7 +161,6 @@ struct MacSettingsView: View {
             }
 
             Section("Audio") {
-                LabeledContent("Download Quality", value: settings.downloadQualityDescription)
                 Toggle("Measure loudness", isOn: $settings.measuresLoudness)
                 Text("Reads each file once to show its LUFS. Dubplate never changes your audio.")
                     .font(DubplateType.metadata)
@@ -186,6 +185,12 @@ struct MacSettingsView: View {
                 Button("Show in Finder") {
                     RevealInFinder.reveal(services.mediaStore.root)
                 }
+            }
+
+            Section("About") {
+                Text(DubplateSettings.audioPolicy)
+                    .font(DubplateType.metadata)
+                    .foregroundStyle(DubplateColor.tertiaryText)
             }
         }
         .formStyle(.grouped)

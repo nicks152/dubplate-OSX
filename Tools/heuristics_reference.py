@@ -13,12 +13,20 @@ VERSION_KEYWORDS = {
     "v","ver","version","mix","mixes","master","mastered","mstr","bounce","take",
     "pass","print","rough","demo","sketch","idea","final","alt","alternate","edit",
     "ref","reference","wip","draft","comp","rev","revision","test","tweak","tweaks",
-    "fix","fixed","drums","drum","vox","vocal","vocals","bass","keys","gtr","guitar",
-    "synth","stems","inst","instrumental","acapella","backup","copy","revised",
-    "clean","dirty","wet","dry","loud","quiet","louder","quieter","radio","extended",
+    "fix","fixed","backup","copy","revised",
 }
+# Words that describe a bounce but are also perfectly good song titles. Only ever
+# stripped when a real word would still be left behind.
+DESCRIPTOR_WORDS = {
+    "drums","drum","vox","vocal","vocals","bass","keys","gtr","guitar","synth",
+    "stems","inst","instrumental","acapella","clean","dirty","wet","dry","loud",
+    "quiet","louder","quieter","radio","extended",
+}
+# A different rendering of the same song rather than a newer one: added as a
+# version, never made current.
+VARIANT_WORDS = {"instrumental","inst","acapella","clean","radio","extended","stems"}
 MODIFIER_WORDS = {"new","old","more","less","no","without","with","extra","another"}
-WEAK_TOKENS = VERSION_KEYWORDS | MODIFIER_WORDS | {"up","down","long","short","only"}
+WEAK_TOKENS = VERSION_KEYWORDS | DESCRIPTOR_WORDS | MODIFIER_WORDS | {"up","down","long","short","only"}
 AUDIO_EXT = {"wav","wave","aif","aiff","aifc","caf","flac","m4a","mp4","alac","aac","mp3","m4b"}
 
 
@@ -89,6 +97,9 @@ def extract_parentheticals(text):
 
 
 def leading_track_number(words):
+    """Returns (number, remaining_words). A bare number keeps its place in the
+    title unless it is written the way track numbers are written — "04", not "24"
+    — because "24 Hours" is a song and "04 Midnight" is track four."""
     if not words:
         return None
     first = words[0]
@@ -96,18 +107,19 @@ def leading_track_number(words):
     if low in ("track", "trk", "tk") and len(words) > 1 and words[1].isdigit():
         v = int(words[1])
         if 1 <= v <= 99:
-            return v, words[2:]
+            return v, words[2:], True
     if first.isdigit() and len(first) <= 3 and len(words) > 1:
         v = int(first)
         if 1 <= v <= 199:
-            return v, words[1:]
+            padded = first[0] == "0"
+            return v, (words[1:] if padded else words), padded
     if len(first) == 2 and first[0].isalpha() and first[1].isdigit() \
             and first[0].lower() in "abcd" and len(words) > 1:
-        return int(first[1]), words[1:]
+        return int(first[1]), words[1:], True
     return None
 
 
-def strip_version_tail(words, track_number):
+def strip_version_tail(words, track_number, number_is_padded):
     remaining = list(words)
     tail = []
     while remaining:
@@ -117,6 +129,10 @@ def strip_version_tail(words, track_number):
         if sp and sp[0] in VERSION_KEYWORDS:
             tail.insert(0, last); remaining.pop(); continue
         if low in VERSION_KEYWORDS:
+            tail.insert(0, last); remaining.pop(); continue
+        # A descriptor is only a marker when a real word survives it: "05 Bass.wav"
+        # is a track called Bass, "Midnight drums.wav" is a mix of Midnight.
+        if low in DESCRIPTOR_WORDS and len(remaining) > 1:
             tail.insert(0, last); remaining.pop(); continue
         # "new" in "new drums" only counts once something after it was peeled.
         if low in MODIFIER_WORDS and tail:
@@ -129,8 +145,9 @@ def strip_version_tail(words, track_number):
         break
     if not remaining and len(tail) == 1 and tail[0].isdigit():
         return list(words), []
-    # Never strip a name down to nothing unless a track number can stand in for it.
-    if not remaining and track_number is None:
+    # Never strip a name down to nothing unless the filename actually named a
+    # track slot rather than merely starting with a number.
+    if not remaining and not number_is_padded:
         return list(words), []
     return remaining, tail
 
@@ -185,11 +202,13 @@ def parse(filename):
         non_numeric = [s for s in segments if not s.isdigit()]
         working = non_numeric[-1] if non_numeric else working
     words = tokenize(working)
+    padded = track_number is not None
     lead = leading_track_number(words)
     if lead:
         track_number = track_number if track_number is not None else lead[0]
         words = lead[1]
-    words, consumed = strip_version_tail(words, track_number)
+        padded = padded or lead[2]
+    words, consumed = strip_version_tail(words, track_number, padded)
     consumed = consumed + group_tokens
     title = presentable_title(words, track_number, stem(filename))
     key = normalize("".join(words)) or normalize(title)
@@ -200,6 +219,7 @@ def parse(filename):
         "versionOrdinal": ordinal(consumed) if consumed else None,
         "featured": featured,
         "matchKey": key,
+        "isVariant": any(t.lower() in VARIANT_WORDS for t in consumed),
     }
 
 
@@ -329,6 +349,13 @@ CASES = [
     ("Dust (feat. Someone) v3.wav",   None,"Dust",       "v3"),
     ("10.wav",                        None,"10",         None),
     ("Blue Room bounce 12.wav",       None,"Blue Room",  "Bounce 12"),
+    ("07 Instrumental.wav",           7,   "Instrumental", None),
+    ("05 Bass.wav",                   5,   "Bass",       None),
+    ("09 Clean.wav",                  9,   "Clean",      None),
+    ("24 Hours.wav",                  24,  "24 Hours",   None),
+    ("7 Rings.wav",                   7,   "7 Rings",    None),
+    ("Midnight instrumental.wav",     None,"Midnight",   "Instrumental"),
+    ("Midnight drums.wav",            None,"Midnight",   "Drums"),
 ]
 
 MATCH_CASES = [

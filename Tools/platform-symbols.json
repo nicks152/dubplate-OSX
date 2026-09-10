@@ -272,7 +272,9 @@
     "DecodingError",
     "EncodingError",
     "NSCoder",
-    "NSNotificationName"
+    "NSNotificationName",
+    "ObjCBool",
+    "URLResourceValues"
   ],
   "swiftui": [
     "Alignment",
@@ -824,6 +826,12 @@
     "XCUIApplicationState",
     "XCUIElementType",
     "XCTAttachmentLifetime",
-    "XCTContext"
+    "XCTContext",
+    "NWPathMonitor",
+    "NWPath",
+    "NWInterface",
+    "NWConnection",
+    "NWEndpoint",
+    "NWParameters"
   ]
 }

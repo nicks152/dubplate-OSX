@@ -12,11 +12,14 @@ import DubplateCore
 /// Dubplate does not reimplement any of it.
 public actor MediaTransferService {
 
-    /// One file's progress, for the interface.
+    /// One file on the move.
+    ///
+    /// No fraction: the async `modifyRecords`/`record(for:)` APIs report none, and a
+    /// progress bar frozen at zero for the length of a 300 MB transfer is a worse
+    /// lie than a word.
     public struct Transfer: Sendable, Identifiable {
         public let id: UUID
         public var filename: String
-        public var fractionCompleted: Double
         public var isUpload: Bool
     }
 
@@ -73,6 +76,7 @@ public actor MediaTransferService {
         for assetID in assetIDs {
             guard !cancelled.contains(assetID) else { continue }
             guard let descriptor = await index.descriptor(for: assetID),
+                  !descriptor.isUploaded,
                   mediaStore.exists(relativePath: descriptor.relativePath)
             else { continue }
 
@@ -84,23 +88,25 @@ public actor MediaTransferService {
             record[Self.assetIDField] = assetID.uuidString
             record[Self.fileField] = CKAsset(fileURL: url)
 
-            begin(Transfer(id: assetID, filename: descriptor.originalFilename, fractionCompleted: 0, isUpload: true))
+            begin(Transfer(id: assetID, filename: descriptor.originalFilename, isUpload: true))
             do {
-                _ = try await database.modifyRecords(
+                let response = try await database.modifyRecords(
                     saving: [record],
                     deleting: [],
                     savePolicy: .allKeys
                 )
-                await index.markUploaded(assetID)
-                await onAvailabilityChanged?(assetID, .available)
-                Log.sync.info("Uploaded \(descriptor.originalFilename, privacy: .public)")
+                // `modifyRecords` does not throw when an individual record fails —
+                // it reports per-record results. Ignoring them meant a quota-exceeded
+                // upload was recorded as a success, and "Remove Download" would then
+                // happily delete the only copy of a master.
+                try await recordOutcome(of: response.saveResults[record.recordID], for: assetID, descriptor: descriptor)
             } catch let error as CKError where error.code == .serverRecordChanged {
                 // Already up there. Assets never change once written, so this is a
                 // success, not a conflict.
                 await index.markUploaded(assetID)
+                await onAvailabilityChanged?(assetID, .available)
             } catch {
-                Log.sync.error("Upload failed for \(descriptor.originalFilename, privacy: .public): \(String(describing: error))")
-                await onAvailabilityChanged?(assetID, .local)
+                await note(failure: error, for: assetID, descriptor: descriptor)
             }
             finish(assetID)
         }
@@ -118,7 +124,7 @@ public actor MediaTransferService {
                 continue
             }
 
-            begin(Transfer(id: assetID, filename: descriptor.originalFilename, fractionCompleted: 0, isUpload: false))
+            begin(Transfer(id: assetID, filename: descriptor.originalFilename, isUpload: false))
             await onAvailabilityChanged?(assetID, .downloading)
 
             do {
@@ -165,7 +171,14 @@ public actor MediaTransferService {
         guard !assetIDs.isEmpty else { return }
         let ids = assetIDs.map { CKRecord.ID(recordName: $0.uuidString, zoneID: zoneID) }
         do {
-            _ = try await database.modifyRecords(saving: [], deleting: ids)
+            let response = try await database.modifyRecords(saving: [], deleting: ids)
+            for (recordID, result) in response.deleteResults {
+                if case .failure(let error) = result {
+                    Log.sync.error(
+                        "Could not delete \(recordID.recordName, privacy: .public): \(String(describing: error))"
+                    )
+                }
+            }
         } catch {
             Log.sync.error("Could not delete media records: \(String(describing: error))")
         }
@@ -177,6 +190,62 @@ public actor MediaTransferService {
 
     public func clearCancellations() {
         cancelled.removeAll()
+    }
+
+    /// Called when something goes wrong that a person should hear about.
+    public var onError: (@Sendable (DubplateError) async -> Void)?
+
+    public func setErrorHandler(_ handler: @escaping @Sendable (DubplateError) async -> Void) {
+        onError = handler
+    }
+
+    // MARK: - Results
+
+    private func recordOutcome(
+        of result: Result<CKRecord, any Error>?,
+        for assetID: UUID,
+        descriptor: MediaDescriptor
+    ) async throws {
+        guard let result else {
+            // No result for the record we sent: treat as not uploaded rather than
+            // assuming success.
+            await onAvailabilityChanged?(assetID, .local)
+            return
+        }
+        switch result {
+        case .success:
+            await index.markUploaded(assetID)
+            await onAvailabilityChanged?(assetID, .available)
+            Log.sync.info("Uploaded \(descriptor.originalFilename, privacy: .public)")
+        case .failure(let error):
+            if let ckError = error as? CKError, ckError.code == .serverRecordChanged {
+                await index.markUploaded(assetID)
+                await onAvailabilityChanged?(assetID, .available)
+                return
+            }
+            await note(failure: error, for: assetID, descriptor: descriptor)
+        }
+    }
+
+    private func note(failure error: any Error, for assetID: UUID, descriptor: MediaDescriptor) async {
+        Log.sync.error(
+            "Upload failed for \(descriptor.originalFilename, privacy: .public): \(String(describing: error))"
+        )
+        await onAvailabilityChanged?(assetID, .local)
+        guard let ckError = error as? CKError else {
+            await onError?(DubplateError(.transferFailed, subject: descriptor.originalFilename, underlying: error))
+            return
+        }
+        switch ckError.code {
+        case .quotaExceeded:
+            await onError?(DubplateError(.storageFull, subject: descriptor.originalFilename))
+        case .networkFailure, .networkUnavailable, .serviceUnavailable, .requestRateLimited:
+            // The engine retries these on its own schedule; not worth interrupting
+            // anyone over.
+            break
+        default:
+            await onError?(DubplateError(.transferFailed, subject: descriptor.originalFilename, underlying: error))
+        }
     }
 
     // MARK: - Internals

@@ -11,7 +11,9 @@ public struct TrackRow: View {
     private let isCurrent: Bool
     private let isPlaying: Bool
     private let showsArtwork: Bool
+    private let playingVersionID: UUID?
     private let onPlay: () -> Void
+    private let onShowVersions: (() -> Void)?
 
     @State private var isHovering = false
 
@@ -20,13 +22,17 @@ public struct TrackRow: View {
         isCurrent: Bool = false,
         isPlaying: Bool = false,
         showsArtwork: Bool = false,
-        onPlay: @escaping () -> Void
+        playingVersionID: UUID? = nil,
+        onPlay: @escaping () -> Void,
+        onShowVersions: (() -> Void)? = nil
     ) {
         self.track = track
         self.isCurrent = isCurrent
         self.isPlaying = isPlaying
         self.showsArtwork = showsArtwork
+        self.playingVersionID = playingVersionID
         self.onPlay = onPlay
+        self.onShowVersions = onShowVersions
     }
 
     public var body: some View {
@@ -60,7 +66,17 @@ public struct TrackRow: View {
             Spacer(minLength: DubplateLayout.s)
 
             if track.versionCount > 1 {
-                VersionPill(count: track.versionCount, label: track.currentVersion?.shortName ?? "")
+                let pill = VersionPill(
+                    count: track.versionCount,
+                    label: displayedVersion?.shortName ?? "",
+                    isAuditioning: isAuditioning
+                )
+                if let onShowVersions {
+                    Button(action: onShowVersions) { pill }
+                        .buttonStyle(.plain)
+                } else {
+                    pill
+                }
             }
 
             AvailabilityBadge(state: track.availability)
@@ -97,8 +113,27 @@ public struct TrackRow: View {
         }
     }
 
+    /// While a previous mix is being auditioned the row must say so — otherwise you
+    /// walk away believing the record now sounds like what you just heard.
+    private var isAuditioning: Bool {
+        guard let playingVersionID, isCurrent else { return false }
+        return playingVersionID != track.currentVersionID
+    }
+
+    private var displayedVersion: TrackVersion? {
+        guard let playingVersionID, isCurrent,
+              let playing = (track.versions ?? []).first(where: { $0.id == playingVersionID })
+        else {
+            return track.currentVersion
+        }
+        return playing
+    }
+
     private var secondary: String? {
         var parts: [String] = []
+        if isAuditioning, let label = displayedVersion?.listeningLabel {
+            parts.append("Hearing \(label)")
+        }
         if let feature = track.featureLine { parts.append(feature) }
         if let explanation = track.availability.listenerExplanation { parts.append(explanation) }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
@@ -117,24 +152,29 @@ public struct TrackRow: View {
 }
 
 /// "v5 · 4" — the current version and how many there are.
+/// "4 mixes" — plain language rather than version-control notation, on a surface
+/// that is meant to read like a track list.
 public struct VersionPill: View {
     private let count: Int
     private let label: String
+    private let isAuditioning: Bool
 
-    public init(count: Int, label: String) {
+    public init(count: Int, label: String, isAuditioning: Bool = false) {
         self.count = count
         self.label = label
+        self.isAuditioning = isAuditioning
     }
 
     public var body: some View {
-        Text(label.isEmpty ? "\(count)" : "\(label) · \(count)")
+        Text("\(count) mixes")
             .font(DubplateType.label)
             .kerning(0.4)
-            .foregroundStyle(DubplateColor.secondaryText)
+            .foregroundStyle(isAuditioning ? DubplateColor.ground : DubplateColor.secondaryText)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .background(DubplateColor.sunken, in: Capsule())
-            .accessibilityLabel("\(count) versions, current \(label)")
+            .background(isAuditioning ? DubplateColor.accent : DubplateColor.sunken, in: Capsule())
+            .accessibilityLabel("\(count) mixes, currently \(label)")
+            .accessibilityHint("Shows every mix of this track")
     }
 }
 

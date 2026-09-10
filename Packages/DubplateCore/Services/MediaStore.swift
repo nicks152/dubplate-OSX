@@ -22,15 +22,20 @@ public struct MediaStore: Sendable {
     }
 
     public let root: URL
-    private let fileManager: FileManager
 
-    public init(root: URL, fileManager: FileManager = .default) {
+    /// `FileManager` is not `Sendable`, and a `MediaStore` crosses actor boundaries
+    /// constantly. `FileManager.default` is documented as safe to use from multiple
+    /// threads, so the store holds nothing but its root and reaches for the shared
+    /// instance where it needs one.
+    private var fileManager: FileManager { .default }
+
+    public init(root: URL) {
         self.root = root
-        self.fileManager = fileManager
     }
 
     /// The default location: `Application Support/Dubplate/Media`.
-    public static func makeDefault(fileManager: FileManager = .default) throws -> MediaStore {
+    public static func makeDefault() throws -> MediaStore {
+        let fileManager = FileManager.default
         let support = try fileManager.url(
             for: .applicationSupportDirectory,
             in: .userDomainMask,
@@ -39,7 +44,7 @@ public struct MediaStore: Sendable {
         )
         let root = support.appending(path: "Dubplate", directoryHint: .isDirectory)
             .appending(path: "Media", directoryHint: .isDirectory)
-        let store = MediaStore(root: root, fileManager: fileManager)
+        let store = MediaStore(root: root)
         try store.prepare()
         return store
     }

@@ -15,7 +15,13 @@ public final class ArtworkAsset {
     public var fileSize: Int64 = 0
     public var checksum: String = ""
     public var createdAt: Date = Date.distantPast
-    public var availabilityRaw: String = AvailabilityState.local.rawValue
+
+    /// Per-device, so not persisted. See `AudioAsset.localPresence`.
+    @Transient
+    public var localPresence: Bool?
+
+    @Transient
+    public var transferState: AvailabilityState?
     /// Seconds into a video where the loop should start, for trimmed motion artwork.
     public var loopStart: TimeInterval = 0
     /// Loop length in seconds. Zero means "the whole file".
@@ -25,6 +31,15 @@ public final class ArtworkAsset {
     /// A small JPEG rendition used for lists, remote command centre artwork and the
     /// Lock Screen so nothing decodes a 4000px cover on a scroll.
     public var thumbnailData: Data?
+
+    // Inverses. CloudKit mirroring refuses a model with an unpaired relationship,
+    // and the failure is a store that will not open — which the fallback path then
+    // turns into a quiet downgrade to local-only. Release points at artwork twice,
+    // so it needs two distinct inverses.
+    public var coverForRelease: Release?
+    public var motionForRelease: Release?
+    public var canvasForTrack: Track?
+    public var avatarForProfile: ArtistProfile?
 
     public init(
         id: UUID = UUID(),
@@ -48,7 +63,7 @@ public final class ArtworkAsset {
         self.height = height
         self.fileSize = fileSize
         self.checksum = checksum
-        self.availabilityRaw = availability.rawValue
+        self.localPresence = availability.isPlayableNow
         self.createdAt = createdAt
     }
 
@@ -58,8 +73,23 @@ public final class ArtworkAsset {
     }
 
     public var availability: AvailabilityState {
-        get { AvailabilityState(rawValue: availabilityRaw) ?? .local }
-        set { availabilityRaw = newValue.rawValue }
+        get {
+            if let transferState { return transferState }
+            guard let localPresence else { return .available }
+            return localPresence ? .available : .cloudOnly
+        }
+        set {
+            switch newValue {
+            case .available, .local:
+                localPresence = true
+                transferState = nil
+            case .cloudOnly:
+                localPresence = false
+                transferState = nil
+            case .downloading, .error, .missing:
+                transferState = newValue
+            }
+        }
     }
 
     public var pixelSummary: String {

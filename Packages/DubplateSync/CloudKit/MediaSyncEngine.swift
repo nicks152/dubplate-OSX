@@ -102,6 +102,14 @@ public actor MediaSyncEngine {
         engine = nil
     }
 
+    /// Throws away the change token and starts again. Used when the account changes,
+    /// where the token refers to a database this device can no longer see.
+    public func resetState() async {
+        engine = nil
+        try? FileManager.default.removeItem(at: configuration.stateURL)
+        await start()
+    }
+
     /// Adds media to the upload queue. Safe to call for something already queued.
     public func queueUploads(_ assetIDs: [UUID]) {
         guard let engine, !assetIDs.isEmpty else { return }
@@ -203,6 +211,14 @@ extension MediaSyncEngine: CKSyncEngineDelegate {
                 await handle(failure: failure, syncEngine: syncEngine)
             }
 
+        case .fetchedDatabaseChanges(let changes):
+            // A zone deleted on another device means everything in it is gone from
+            // CloudKit; the local files stay, but they are no longer uploaded.
+            if !changes.deletions.isEmpty {
+                await index.markEverythingNotUploaded()
+                Log.sync.info("A media zone was removed elsewhere; everything is queued to upload again")
+            }
+
         case .willSendChanges, .willFetchChanges:
             await onActivityChanged?(true)
 
@@ -291,7 +307,10 @@ extension MediaSyncEngine: CKSyncEngineDelegate {
         await index.remove(assetID)
     }
 
-    private func handle(failure: (record: CKRecord, error: CKError), syncEngine: CKSyncEngine) async {
+    private func handle(
+        failure: CKSyncEngine.Event.SentRecordZoneChanges.FailedRecordSave,
+        syncEngine: CKSyncEngine
+    ) async {
         guard let assetID = UUID(uuidString: failure.record.recordID.recordName) else { return }
         switch failure.error.code {
         case .serverRecordChanged:
@@ -321,9 +340,11 @@ extension MediaSyncEngine: CKSyncEngineDelegate {
             let pending = await index.all().map(\.assetID)
             queueUploads(pending)
         case .signOut, .switchAccounts:
-            // Local media stays exactly where it is. Dubplate never removes a
-            // person's audio because an account changed.
-            Log.sync.info("iCloud account changed; local library untouched")
+            // Local media stays exactly where it is — Dubplate never removes a
+            // person's audio because an account changed — but nothing on this device
+            // can be assumed to be in the new account any more.
+            Log.sync.info("iCloud account changed; local library untouched, upload state cleared")
+            await index.markEverythingNotUploaded()
         @unknown default:
             break
         }

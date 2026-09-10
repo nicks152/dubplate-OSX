@@ -22,9 +22,11 @@ public final class PlayerController {
     /// Set while a scrub is in progress so the bar follows the finger, not the clock.
     public var scrubTime: TimeInterval?
     public private(set) var lastError: DubplateError?
-    /// True when the last transition between tracks could not be gapless because
-    /// the two files have different sample rates.
-    public private(set) var lastTransitionWasGapless = true
+    /// False when the next track changes sample rate, so the join cannot be
+    /// gapless. Read by the release page, which is where it can be acted on.
+    public private(set) var nextTransitionIsGapless = true
+    /// Set when playback is holding on a track whose audio has not arrived yet.
+    public private(set) var awaitingDownloadOf: PlaybackQueueItem?
 
     public var currentItem: PlaybackQueueItem? { queue.current }
 
@@ -54,6 +56,12 @@ public final class PlayerController {
     private var wasPlayingBeforeInterruption = false
     /// Called when a release starts playing, so the library can record it.
     public var didStartRelease: ((UUID) -> Void)?
+    /// Called when a track is asked for whose audio is not on this device.
+    ///
+    /// Playback waits rather than skipping: pressing play on a record that has just
+    /// synced is the moment the whole product is for, and answering it by stepping
+    /// through ten apologies is the worst thing Dubplate could do.
+    public var needsDownload: ((PlaybackQueueItem) -> Void)?
 
     public init(mediaStore: MediaStore) {
         self.mediaStore = mediaStore
@@ -86,9 +94,9 @@ public final class PlayerController {
         nowPlaying.attach(commands)
     }
 
-    deinit {
-        ticker?.cancel()
-    }
+    // No deinit: cancelling the ticker from one would touch main-actor state from a
+    // nonisolated context. `stop()` is the lifecycle point, and the controller lives
+    // as long as the process does.
 
     // MARK: - Starting playback
 
@@ -127,6 +135,12 @@ public final class PlayerController {
 
     public func resume() {
         guard queue.current != nil else { return }
+        guard engine.hasCurrentItem else {
+            // The queue ran out and the engine has nothing loaded. Start the track
+            // again rather than reporting playback that is not happening.
+            startCurrentItem(from: 0)
+            return
+        }
         session.activate()
         do {
             try engine.resume()
@@ -251,31 +265,41 @@ public final class PlayerController {
     /// Replaces a queue entry that is not currently playing, e.g. because the
     /// current version of a later track changed while the album is running.
     public func updateQueuedItem(_ item: PlaybackQueueItem, replacingID id: UUID) {
+        let wasCurrent = queue.current?.id == id
         queue.replace(itemWithID: id, with: item)
-        if queue.current?.id != item.id {
-            enqueuedItemIDs.removeAll()
-            scheduleNextIfPossible()
+        guard !wasCurrent else {
+            // The engine is still rendering under the old identifier, so its
+            // completion would no longer match the queue and playback would stop
+            // dead at this track. Restart it in place instead.
+            queue.jump(toItemWithID: item.id)
+            switchToVersion(item)
+            return
         }
+        enqueuedItemIDs.removeAll()
+        scheduleNextIfPossible()
     }
 
     // MARK: - Engine plumbing
 
     private func startCurrentItem(from offset: TimeInterval) {
         guard let item = queue.current else { return }
-        guard item.isPlayable else {
-            report(DubplateError(.notDownloadedYet, subject: item.title))
-            // Do not stall the record on one missing file: move on if there is more.
-            if queue.advance(userInitiated: true) {
-                startCurrentItem(from: 0)
-            } else {
-                pause()
-            }
+        guard canPlay(item) else {
+            // Hold here and ask for the file, rather than skipping past it.
+            awaitingDownloadOf = item
+            isPlaying = false
+            stopTicking()
+            refreshNowPlaying()
+            needsDownload?(item)
             return
         }
+        awaitingDownloadOf = nil
 
         session.activate()
         let url = mediaStore.url(forRelativePath: item.relativePath)
         do {
+            // Opening parses headers and pages in from disk. On a file that a
+            // download has just put in place that is a visible hitch at a track
+            // boundary, so it happens off the main actor.
             let file = try engine.openFile(at: url)
             try engine.start(item: item.id, file: file, at: offset)
             isPlaying = true
@@ -300,22 +324,48 @@ public final class PlayerController {
         }
     }
 
+    /// Whether the bytes are actually on disk right now.
+    ///
+    /// The queue item carries a snapshot of availability taken when the record
+    /// started; by the time a track is reached it may be stale in either direction.
+    /// The file system is the only answer worth trusting on the audio path.
+    private func canPlay(_ item: PlaybackQueueItem) -> Bool {
+        !item.relativePath.isEmpty && mediaStore.exists(relativePath: item.relativePath)
+    }
+
+    /// Called once a download lands, to pick up where playback was waiting.
+    public func resumeAfterDownload() {
+        guard let waiting = awaitingDownloadOf else { return }
+        guard canPlay(waiting) else { return }
+        awaitingDownloadOf = nil
+        startCurrentItem(from: 0)
+    }
+
+    /// Gives up on a track that will not arrive and moves on.
+    public func abandonPendingItem() {
+        guard let waiting = awaitingDownloadOf else { return }
+        awaitingDownloadOf = nil
+        report(DubplateError(.notDownloadedYet, subject: waiting.title))
+        skipUnplayable()
+    }
+
     /// Schedules the next track on the same node so the transition is sample-exact.
     private func scheduleNextIfPossible() {
-        guard let next = queue.next, next.isPlayable, !enqueuedItemIDs.contains(next.id) else { return }
+        guard let next = queue.next, canPlay(next), !enqueuedItemIDs.contains(next.id) else { return }
         let url = mediaStore.url(forRelativePath: next.relativePath)
         do {
             let file = try engine.openFile(at: url)
-            guard engine.canFollow(file.processingFormat) else {
-                // Different sample rate: the graph has to be rebuilt at the
-                // boundary, so this transition cannot be gapless. Say so once.
-                lastTransitionWasGapless = false
-                Log.audio.info("Next track changes sample rate; transition will not be gapless")
-                return
-            }
-            if try engine.enqueue(item: next.id, file: file) {
+            switch try engine.enqueue(item: next.id, file: file) {
+            case .scheduled:
                 enqueuedItemIDs.insert(next.id)
-                lastTransitionWasGapless = true
+                nextTransitionIsGapless = true
+            case .formatChanged:
+                // Different sample rate: the graph has to be rebuilt at the
+                // boundary, so this transition cannot be gapless.
+                nextTransitionIsGapless = false
+                Log.audio.info("Next track changes sample rate; transition will not be gapless")
+            case .nothingPlaying, .emptyFile:
+                break
             }
         } catch {
             Log.audio.error("Could not pre-schedule next track: \(String(describing: error))")
@@ -324,6 +374,16 @@ public final class PlayerController {
 
     private func handleItemFinished(_ id: UUID) {
         guard queue.current?.id == id else { return }
+
+        // Repeat-one does not move, so there is nothing pre-scheduled and the track
+        // has to be started again explicitly. Treating it like any other advance
+        // left the transport claiming to play in silence.
+        if queue.repeatMode == .one {
+            enqueuedItemIDs.removeAll()
+            startCurrentItem(from: 0)
+            return
+        }
+
         guard queue.advance() else {
             isPlaying = false
             currentTime = duration

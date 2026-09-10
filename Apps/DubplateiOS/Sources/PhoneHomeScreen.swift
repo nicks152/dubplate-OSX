@@ -21,7 +21,10 @@ struct PhoneHomeScreen: View {
                     searchResults
                 } else {
                     if let recent = mostRecent {
-                        featured(recent)
+                        VStack(alignment: .leading, spacing: DubplateLayout.m) {
+                            SectionHeader(recent.lastPlayedAt == nil ? "Newest" : "Recently Played")
+                            featured(recent)
+                        }
                     }
                     if !otherRecents.isEmpty {
                         VStack(alignment: .leading, spacing: DubplateLayout.m) {
@@ -72,19 +75,27 @@ struct PhoneHomeScreen: View {
     }
 
     private func featured(_ release: Release) -> some View {
-        Button {
-            open(release)
-        } label: {
-            VStack(alignment: .leading, spacing: DubplateLayout.l) {
+        VStack(alignment: .leading, spacing: DubplateLayout.l) {
+            Button {
+                open(release)
+            } label: {
                 ArtworkView(
                     asset: release.artwork,
                     title: release.title,
                     cornerRadius: DubplateLayout.largeArtworkRadius
                 )
+                // Capped rather than full-bleed, so the shelf underneath is
+                // visible without scrolling — a library should look like a library.
+                .frame(maxWidth: 300)
                 .frame(maxWidth: .infinity)
                 .shadow(color: .black.opacity(0.35), radius: 28, y: 14)
+            }
+            .buttonStyle(.plain)
 
-                HStack(alignment: .bottom) {
+            HStack(alignment: .bottom) {
+                Button {
+                    open(release)
+                } label: {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(release.title.isEmpty ? "Untitled" : release.title)
                             .dubplateDisplayStyle(size: 26)
@@ -96,22 +107,24 @@ struct PhoneHomeScreen: View {
                             .font(DubplateType.metadata)
                             .foregroundStyle(DubplateColor.tertiaryText)
                     }
-                    Spacer()
-                    Button {
-                        services.play(release: release)
-                    } label: {
-                        Image(systemName: "play.fill")
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(DubplateColor.ground)
-                            .frame(width: 52, height: 52)
-                            .background(DubplateColor.primaryText, in: Circle())
-                    }
-                    .buttonStyle(PressableButtonStyle())
-                    .accessibilityLabel("Play \(release.title)")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+
+                Button {
+                    services.play(release: release)
+                } label: {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(DubplateColor.ground)
+                        .frame(width: 52, height: 52)
+                        .background(DubplateColor.primaryText, in: Circle())
+                }
+                .buttonStyle(PressableButtonStyle())
+                .accessibilityLabel("Play \(release.title)")
             }
         }
-        .buttonStyle(.plain)
     }
 
     private var yourMusic: some View {

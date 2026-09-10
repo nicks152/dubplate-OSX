@@ -100,7 +100,12 @@ def strip_noise(src: str) -> str:
 
 
 def _consume_string(src: str, i: int, hashes: int) -> tuple[int, str]:
-    """Consume a string literal starting at src[i] == '"'. Returns (index, blanked)."""
+    """Consume a string literal starting at src[i] == '"'. Returns (index, blanked).
+
+    Interpolations are consumed too, including strings nested inside them — a title
+    like "Delete \\(name.isEmpty ? "Untitled" : name)?" would otherwise end the
+    string at the inner quote and leave `Untitled` looking like code.
+    """
     n = len(src)
     closing_hashes = "#" * hashes
     multiline = src.startswith('"""', i)
@@ -108,12 +113,26 @@ def _consume_string(src: str, i: int, hashes: int) -> tuple[int, str]:
     out = [" " * len(quote)]
     i += len(quote)
     escape = "\\" + closing_hashes
+
     while i < n:
-        if src.startswith(escape, i) and not multiline:
+        if src.startswith(escape + "(", i):
+            # An interpolation: skip to its matching ')', respecting nested strings.
             out.append(" " * (len(escape) + 1))
             i += len(escape) + 1
+            depth = 1
+            while i < n and depth > 0:
+                if src[i] == '"':
+                    i, chunk = _consume_string(src, i, 0)
+                    out.append(chunk)
+                    continue
+                if src[i] == "(":
+                    depth += 1
+                elif src[i] == ")":
+                    depth -= 1
+                out.append("\n" if src[i] == "\n" else " ")
+                i += 1
             continue
-        if src.startswith(escape, i) and multiline:
+        if src.startswith(escape, i):
             out.append(" " * (len(escape) + 1))
             i += len(escape) + 1
             continue
@@ -377,6 +396,7 @@ def check_swiftdata_models(module: Module, sources: dict[str, str], findings: li
                 findings.append(Finding(
                     "error", rel(path), offset, "cloudkit-delete-rule",
                     ".deny delete rules are not supported by CloudKit mirroring"))
+            check_relationship_inverses(body, rel(path), offset, findings)
             for prop in PROPERTY_RE.finditer(body):
                 name, type_text, tail = prop.group(1), prop.group(2).strip(), prop.group(3)
                 line = offset + body[: prop.start()].count("\n")
@@ -453,6 +473,34 @@ def check_environment_objects(modules: list[Module], sources: dict[str, str],
             findings.append(Finding(
                 "error", rel(path), line, "environment",
                 f"@Environment({name}.self) is read but {app_name} injects no {name}"))
+
+
+RELATIONSHIP_RE = re.compile(
+    r"@Relationship\(([^)]*)\)\s*(?:public |private |internal |package )?var\s+(\w+)\s*:\s*([^\n=]+)"
+)
+
+
+def check_relationship_inverses(body: str, path: str, offset: int, findings: list[Finding]) -> None:
+    """CloudKit mirroring refuses a model with a relationship that has no inverse.
+
+    The failure is a store that will not open, which the fallback path then turns
+    into a silent downgrade to a local-only library — the worst possible shape for
+    this particular bug, because everything appears to work and nothing syncs.
+
+    An inverse may be declared on either side, so this only reports a relationship
+    whose *type* is never mentioned in any `inverse:` key path anywhere in the
+    module. That is coarse, and it catches the case that matters.
+    """
+    for match in RELATIONSHIP_RE.finditer(body):
+        arguments, name, type_text = match.group(1), match.group(2), match.group(3).strip()
+        line = offset + body[: match.start()].count("\n")
+        if "inverse:" in arguments:
+            continue
+        target = type_text.strip("[]?").split("<")[-1].strip("> ")
+        findings.append(Finding(
+            "warn", path, line, "relationship-inverse",
+            f"'{name}: {type_text}' declares no inverse; confirm one is declared on "
+            f"{target}, or CloudKit mirroring will refuse the model"))
 
 
 STYLE_RULES = [

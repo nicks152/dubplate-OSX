@@ -14,6 +14,10 @@ public final class AudioAsset {
     public var filename: String = ""
     /// The name the file had in Finder when it was imported. Shown to people.
     public var originalFilename: String = ""
+    /// The folder it was dragged from, for display only — never resolved or opened.
+    /// "Midnight mix 5.wav" exists in six bounce folders; this is how a producer
+    /// tells which one they are listening to.
+    public var sourceFolder: String?
     /// Path relative to the media store root.
     public var relativePath: String = ""
     /// Record name in the private CloudKit database, once uploaded.
@@ -27,11 +31,29 @@ public final class AudioAsset {
     public var createdAt: Date = Date.distantPast
     /// SHA-256 of the file bytes, used to recognise a re-import of the same bounce.
     public var checksum: String = ""
-    public var availabilityRaw: String = AvailabilityState.local.rawValue
+
+    /// Whether the bytes are on *this* device.
+    ///
+    /// Deliberately not persisted and therefore never synced: "is this file here"
+    /// is a different answer on the Mac and on the phone, and a stored value would
+    /// mean the phone telling the Mac that the Mac's own master is unavailable.
+    /// `nil` means "not looked yet", which is treated as available — the playback
+    /// path checks the file itself before it opens it.
+    @Transient
+    public var localPresence: Bool?
+
+    /// Set only while a transfer is in flight or has just failed. In memory only.
+    @Transient
+    public var transferState: AvailabilityState?
     /// Integrated loudness in LUFS, computed lazily in the background. Informational.
     public var integratedLoudness: Double?
     /// Peaks for the scrubber, stored as bytes (one unsigned byte per bucket).
     public var waveformPeaks: Data?
+
+    /// The versions backed by this file. Usually one — but the same master can sit
+    /// on a single and on the album, and then it is two.
+    @Relationship(deleteRule: .nullify, inverse: \TrackVersion.audioAsset)
+    public var versions: [TrackVersion]?
 
     public init(
         id: UUID = UUID(),
@@ -56,13 +78,28 @@ public final class AudioAsset {
         self.codec = format.codec
         self.fileSize = fileSize
         self.checksum = checksum
-        self.availabilityRaw = availability.rawValue
+        self.localPresence = availability.isPlayableNow
         self.createdAt = createdAt
     }
 
     public var availability: AvailabilityState {
-        get { AvailabilityState(rawValue: availabilityRaw) ?? .local }
-        set { availabilityRaw = newValue.rawValue }
+        get {
+            if let transferState { return transferState }
+            guard let localPresence else { return .available }
+            return localPresence ? .available : .cloudOnly
+        }
+        set {
+            switch newValue {
+            case .available, .local:
+                localPresence = true
+                transferState = nil
+            case .cloudOnly:
+                localPresence = false
+                transferState = nil
+            case .downloading, .error, .missing:
+                transferState = newValue
+            }
+        }
     }
 
     public var format: AudioFormatDescription {

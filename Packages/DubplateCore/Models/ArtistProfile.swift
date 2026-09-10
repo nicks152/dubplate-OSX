@@ -11,7 +11,7 @@ public final class ArtistProfile {
     public var createdAt: Date = Date.distantPast
     public var updatedAt: Date = Date.distantPast
 
-    @Relationship(deleteRule: .nullify)
+    @Relationship(deleteRule: .nullify, inverse: \ArtworkAsset.avatarForProfile)
     public var avatar: ArtworkAsset?
 
     public init(

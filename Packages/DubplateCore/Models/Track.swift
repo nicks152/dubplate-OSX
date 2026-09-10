@@ -27,7 +27,7 @@ public final class Track {
     @Relationship(deleteRule: .cascade, inverse: \TrackVersion.track)
     public var versions: [TrackVersion]?
 
-    @Relationship(deleteRule: .nullify)
+    @Relationship(deleteRule: .nullify, inverse: \ArtworkAsset.canvasForTrack)
     public var canvas: ArtworkAsset?
 
     public init(

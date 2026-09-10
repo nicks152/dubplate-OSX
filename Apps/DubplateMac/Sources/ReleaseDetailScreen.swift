@@ -39,7 +39,7 @@ struct ReleaseDetailScreen: View {
         }
         .animation(DubplateMotion.standard, value: selectedTrackID)
         .background(DubplateColor.ground)
-        .onAppear { LibraryRepair.repair(release, in: services.container.mainContext) }
+        .onAppear { services.open(release: release) }
         .dropDestination(for: URL.self) { urls, _ in
             handleDrop(urls)
         } isTargeted: { isTargeted = $0 }

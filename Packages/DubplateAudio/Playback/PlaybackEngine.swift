@@ -22,6 +22,15 @@ public final class PlaybackEngine {
 
     /// A file scheduled on the player node, and where it sits in the render timeline.
     private struct Scheduled {
+        /// Identifies this *scheduling*, not this item.
+        ///
+        /// `AVAudioPlayerNode.stop()` fires the completion handler of everything it
+        /// had scheduled. Keying on the item's identifier meant a seek — which stops
+        /// and re-schedules the same item — saw the old handler fire against the new
+        /// entry and reported the track as finished, so every scrub skipped to the
+        /// next track. The token makes a completion belong to one `scheduleSegment`
+        /// call and nothing else.
+        let generation: UInt64
         let itemID: UUID
         let file: AVAudioFile
         /// Frame the item starts at, measured on the node's sample clock.
@@ -37,10 +46,13 @@ public final class PlaybackEngine {
     private let player = AVAudioPlayerNode()
 
     private var scheduled: [Scheduled] = []
-    /// Sample position of the start of the current render session.
-    private var sessionStartSample: AVAudioFramePosition = 0
     private var currentFormat: AVAudioFormat?
     private var isConnected = false
+    private var nextGeneration: UInt64 = 0
+    /// The last position known while the node was running. `playerTime` returns nil
+    /// once the node is paused, so without this a route change while paused would
+    /// restart the track from the beginning.
+    private var pausedAt: TimeInterval = 0
 
     public private(set) var isPlaying = false
     public private(set) var currentItemID: UUID?
@@ -50,16 +62,28 @@ public final class PlaybackEngine {
     /// Called when the engine had to be rebuilt underneath playback.
     public var configurationDidChange: (() -> Void)?
 
+    /// Kept so the observer can be removed; one leaked observer per engine is one
+    /// too many for something this long-lived.
+    private var configurationObserver: (any NSObjectProtocol)?
+
     public init() {
         engine.attach(player)
-        NotificationCenter.default.addObserver(
+        configurationObserver = NotificationCenter.default.addObserver(
             forName: .AVAudioEngineConfigurationChange,
             object: engine,
             queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated {
+            // A Task hop rather than `assumeIsolated`: the queue is main today, but
+            // asserting isolation from a queue is an assumption, not a guarantee.
+            Task { @MainActor [weak self] in
                 self?.handleConfigurationChange()
             }
+        }
+    }
+
+    deinit {
+        if let configurationObserver {
+            NotificationCenter.default.removeObserver(configurationObserver)
         }
     }
 
@@ -90,36 +114,46 @@ public final class PlaybackEngine {
         try connect(for: file.processingFormat)
         try startEngineIfNeeded()
 
-        sessionStartSample = 0
         currentItemID = id
-        try schedule(id: id, file: file, from: offset, startingAt: 0)
+        pausedAt = offset
+        guard try schedule(id: id, file: file, from: offset, startingAt: 0) else {
+            // Nothing to render — an empty or truncated file. Report it and leave
+            // the transport stopped rather than claiming to be playing silence.
+            isPlaying = false
+            currentItemID = nil
+            reportFinished(id)
+            return
+        }
         player.play()
         isPlaying = true
     }
 
     /// Queues an item to render immediately after everything already scheduled.
     /// Returns false when the format differs and a rebuild is required.
-    @discardableResult
-    public func enqueue(item id: UUID, file: AVAudioFile) throws -> Bool {
-        guard canFollow(file.processingFormat) else { return false }
-        guard let last = scheduled.last else { return false }
-        try schedule(id: id, file: file, from: 0, startingAt: last.startSample + last.frameCount)
-        return true
+    /// Why an enqueue did not happen, so the caller can tell the cases apart.
+    public enum EnqueueResult {
+        case scheduled
+        case formatChanged
+        case nothingPlaying
+        case emptyFile
     }
 
-    /// Drops everything queued behind the current item — used when the queue
-    /// changes while playing.
-    public func clearPending() {
-        guard scheduled.count > 1 else { return }
-        // AVAudioPlayerNode cannot cancel a single scheduled file, so re-anchor by
-        // restarting from the current position with only the current item.
-        guard let current = scheduled.first, let currentItemID else { return }
-        let position = currentTime
-        try? start(item: currentItemID, file: current.file, at: position)
+    @discardableResult
+    public func enqueue(item id: UUID, file: AVAudioFile) throws -> EnqueueResult {
+        guard let last = scheduled.last else { return .nothingPlaying }
+        guard canFollow(file.processingFormat) else { return .formatChanged }
+        let didSchedule = try schedule(
+            id: id,
+            file: file,
+            from: 0,
+            startingAt: last.startSample + last.frameCount
+        )
+        return didSchedule ? .scheduled : .emptyFile
     }
 
     public func pause() {
         guard isPlaying else { return }
+        pausedAt = currentTime
         player.pause()
         isPlaying = false
     }
@@ -139,6 +173,13 @@ public final class PlaybackEngine {
         isPlaying = false
         isConnected = false
         currentFormat = nil
+        pausedAt = 0
+    }
+
+    /// Whether the engine still has something to render. Used by the controller to
+    /// tell "paused mid-track" apart from "the queue ran out".
+    public var hasCurrentItem: Bool {
+        currentItemID != nil
     }
 
     /// Seeks inside the current item.
@@ -158,58 +199,59 @@ public final class PlaybackEngine {
     /// Seconds into the current item.
     public var currentTime: TimeInterval {
         guard let currentItemID,
-              let entry = scheduled.first(where: { $0.itemID == currentItemID }),
-              let renderTime = player.lastRenderTime,
+              let entry = scheduled.first(where: { $0.itemID == currentItemID })
+        else {
+            return pausedAt
+        }
+        guard let renderTime = player.lastRenderTime,
               let playerTime = player.playerTime(forNodeTime: renderTime)
         else {
-            return 0
+            // The node is not running: `playerTime` is nil while paused, and
+            // answering zero here is what used to restart a paused track from the
+            // beginning after a route change.
+            return pausedAt
         }
-        let elapsed = playerTime.sampleTime - sessionStartSample - entry.startSample
+        let elapsed = playerTime.sampleTime - entry.startSample
         let frame = entry.fileStartFrame + max(0, elapsed)
         return Double(frame) / entry.sampleRate
     }
 
-    /// Seconds left in the current item, used to decide when to pre-schedule.
-    public var remainingTime: TimeInterval {
-        guard let currentItemID,
-              let entry = scheduled.first(where: { $0.itemID == currentItemID })
-        else {
-            return 0
-        }
-        let total = Double(entry.fileStartFrame + entry.frameCount) / entry.sampleRate
-        return max(0, total - currentTime)
-    }
-
     // MARK: - Internals
 
+    /// Returns false when there was nothing to schedule.
+    ///
+    /// Never calls `itemDidFinish` itself: doing so re-entered `start` from inside
+    /// `start`, which recursed through a queue of truncated files and left the
+    /// transport claiming to play with nothing scheduled.
+    @discardableResult
     private func schedule(
         id: UUID,
         file: AVAudioFile,
         from offset: TimeInterval,
         startingAt startSample: AVAudioFramePosition
-    ) throws {
+    ) throws -> Bool {
         let sampleRate = file.processingFormat.sampleRate
+        guard sampleRate > 0, file.length > 0 else { return false }
         let startFrame = min(
             AVAudioFramePosition(max(0, offset) * sampleRate),
             max(0, file.length - 1)
         )
         let frameCount = file.length - startFrame
-        guard frameCount > 0 else {
-            // An empty or fully-consumed file: report it as finished rather than
-            // scheduling zero frames, which AVAudioPlayerNode treats as an error.
-            itemDidFinish?(id)
-            return
-        }
+        guard frameCount > 0 else { return false }
 
-        let entry = Scheduled(
-            itemID: id,
-            file: file,
-            startSample: startSample,
-            frameCount: frameCount,
-            fileStartFrame: startFrame,
-            sampleRate: sampleRate
+        nextGeneration += 1
+        let generation = nextGeneration
+        scheduled.append(
+            Scheduled(
+                generation: generation,
+                itemID: id,
+                file: file,
+                startSample: startSample,
+                frameCount: frameCount,
+                fileStartFrame: startFrame,
+                sampleRate: sampleRate
+            )
         )
-        scheduled.append(entry)
 
         player.scheduleSegment(
             file,
@@ -220,17 +262,25 @@ public final class PlaybackEngine {
         ) { [weak self] _ in
             // Fires on an AVFoundation-owned thread.
             Task { @MainActor [weak self] in
-                self?.handleFinished(id: id)
+                self?.handleFinished(generation: generation)
             }
         }
+        return true
     }
 
-    private func handleFinished(id: UUID) {
-        guard scheduled.contains(where: { $0.itemID == id }) else { return }
-        scheduled.removeAll { $0.itemID == id }
-        if currentItemID == id {
+    private func handleFinished(generation: UInt64) {
+        // A completion from a scheduling that has already been superseded — by a
+        // seek, a rebuild, or a new track — is not this track ending.
+        guard let index = scheduled.firstIndex(where: { $0.generation == generation }) else { return }
+        let entry = scheduled.remove(at: index)
+        if currentItemID == entry.itemID {
+            pausedAt = 0
             currentItemID = scheduled.first?.itemID
         }
+        reportFinished(entry.itemID)
+    }
+
+    private func reportFinished(_ id: UUID) {
         itemDidFinish?(id)
     }
 
@@ -271,11 +321,18 @@ public final class PlaybackEngine {
         }
         let position = currentTime
         let wasPlaying = isPlaying
+        let pending = scheduled.filter { $0.itemID != currentItemID }
         isConnected = false
         currentFormat = nil
         do {
             try start(item: currentItemID, file: entry.file, at: position)
+            // Put back whatever was queued behind it, so the next boundary is still
+            // gapless after a headphone change.
+            for item in pending {
+                _ = try? enqueue(item: item.itemID, file: item.file)
+            }
             if !wasPlaying {
+                pausedAt = position
                 player.pause()
                 isPlaying = false
             }

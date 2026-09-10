@@ -40,7 +40,7 @@ struct PhoneReleaseScreen: View {
         .background(DubplateColor.ground)
         .navigationTitle(release.title)
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear { LibraryRepair.repair(release, in: services.container.mainContext) }
+        .onAppear { services.open(release: release) }
         .sheet(item: $versionsTrack) { track in
             VersionPickerSheet(
                 track: track,

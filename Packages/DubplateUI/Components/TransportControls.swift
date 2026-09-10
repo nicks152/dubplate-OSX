@@ -82,7 +82,6 @@ public struct TransportControls: View {
             }
             .buttonStyle(PressableButtonStyle())
             .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
-            .keyboardShortcut(.space, modifiers: [])
 
             button(systemName: "forward.fill", label: "Next track", size: size.glyph) {
                 player.next()

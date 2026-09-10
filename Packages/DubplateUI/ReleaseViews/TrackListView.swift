@@ -15,6 +15,8 @@ public struct TrackListView: View {
     private let onPlay: (Track) -> Void
     private let onMove: ((IndexSet, Int) -> Void)?
     private let onDropAudio: ((Track, [URL]) -> Void)?
+    private let onShowVersions: ((Track) -> Void)?
+    private let onRemove: ((Track) -> Void)?
     private let onDelete: ((Track) -> Void)?
 
     public init(
@@ -26,6 +28,8 @@ public struct TrackListView: View {
         onPlay: @escaping (Track) -> Void,
         onMove: ((IndexSet, Int) -> Void)? = nil,
         onDropAudio: ((Track, [URL]) -> Void)? = nil,
+        onShowVersions: ((Track) -> Void)? = nil,
+        onRemove: ((Track) -> Void)? = nil,
         onDelete: ((Track) -> Void)? = nil
     ) {
         self.tracks = tracks
@@ -36,6 +40,8 @@ public struct TrackListView: View {
         self.onPlay = onPlay
         self.onMove = onMove
         self.onDropAudio = onDropAudio
+        self.onShowVersions = onShowVersions
+        self.onRemove = onRemove
         self.onDelete = onDelete
     }
 
@@ -63,9 +69,17 @@ public struct TrackListView: View {
                 }
                 .contextMenu {
                     Button("Play") { onPlay(track) }
+                    if let onShowVersions, track.versionCount > 1 {
+                        Button("Versions…") { onShowVersions(track) }
+                    }
+                    Divider()
+                    if let onRemove {
+                        // Non-destructive: the track goes back to the Inbox with
+                        // every mix intact.
+                        Button("Move to Inbox") { onRemove(track) }
+                    }
                     if let onDelete {
-                        Divider()
-                        Button("Remove from Release", role: .destructive) { onDelete(track) }
+                        Button(deleteTitle(for: track), role: .destructive) { onDelete(track) }
                     }
                 }
             }
@@ -78,6 +92,13 @@ public struct TrackListView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .animation(DubplateMotion.standard, value: tracks.map(\.id))
+    }
+
+    /// Names what will actually be destroyed, because "Remove from Release" did not.
+    private func deleteTitle(for track: Track) -> String {
+        track.versionCount > 1
+            ? "Delete Track and Its \(track.versionCount) Mixes…"
+            : "Delete Track…"
     }
 
     private func rowBackground(for track: Track) -> some View {

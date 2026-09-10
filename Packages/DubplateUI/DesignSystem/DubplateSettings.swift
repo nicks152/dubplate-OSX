@@ -37,7 +37,6 @@ public final class DubplateSettings {
     private enum Key {
         static let syncEnabled = "sync.enabled"
         static let cellularDownloads = "downloads.cellular"
-        static let keepRecentOffline = "downloads.keepRecent"
         static let appearance = "appearance"
         static let defaultPreviewMode = "preview.default"
         static let measuresLoudness = "analysis.loudness"
@@ -45,32 +44,72 @@ public final class DubplateSettings {
 
     private let defaults: UserDefaults
 
-    public var syncEnabled: Bool { didSet { defaults.set(syncEnabled, forKey: Key.syncEnabled) } }
-    public var allowsCellularDownloads: Bool { didSet { defaults.set(allowsCellularDownloads, forKey: Key.cellularDownloads) } }
-    public var keepsRecentlyPlayedOffline: Bool { didSet { defaults.set(keepsRecentlyPlayedOffline, forKey: Key.keepRecentOffline) } }
-    public var appearance: Appearance { didSet { defaults.set(appearance.rawValue, forKey: Key.appearance) } }
-    public var defaultPreviewMode: PreviewMode { didSet { defaults.set(defaultPreviewMode.rawValue, forKey: Key.defaultPreviewMode) } }
-    /// Loudness measurement is opt-in: it reads every file once, and a producer who
-    /// does not want the number should not pay for it.
-    public var measuresLoudness: Bool { didSet { defaults.set(measuresLoudness, forKey: Key.measuresLoudness) } }
+    /// Storage is a plain observed property; each setting is a computed pair over
+    /// it. `didSet` on a stored property of an `@Observable` type is not a reliable
+    /// place to put a side effect — the macro rewrites those properties — and a
+    /// preference that silently fails to persist is worse than no preference.
+    private var values: [String: String] = [:]
 
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         defaults.register(defaults: [
             Key.syncEnabled: true,
             Key.cellularDownloads: false,
-            Key.keepRecentOffline: true,
             Key.measuresLoudness: false
         ])
-        syncEnabled = defaults.bool(forKey: Key.syncEnabled)
-        allowsCellularDownloads = defaults.bool(forKey: Key.cellularDownloads)
-        keepsRecentlyPlayedOffline = defaults.bool(forKey: Key.keepRecentOffline)
-        appearance = Appearance(rawValue: defaults.string(forKey: Key.appearance) ?? "") ?? .system
-        defaultPreviewMode = PreviewMode(rawValue: defaults.string(forKey: Key.defaultPreviewMode) ?? "") ?? .stream
-        measuresLoudness = defaults.bool(forKey: Key.measuresLoudness)
+        values = [
+            Key.syncEnabled: String(defaults.bool(forKey: Key.syncEnabled)),
+            Key.cellularDownloads: String(defaults.bool(forKey: Key.cellularDownloads)),
+            Key.measuresLoudness: String(defaults.bool(forKey: Key.measuresLoudness)),
+            Key.appearance: defaults.string(forKey: Key.appearance) ?? Appearance.system.rawValue,
+            Key.defaultPreviewMode: defaults.string(forKey: Key.defaultPreviewMode) ?? PreviewMode.stream.rawValue
+        ]
     }
 
-    /// Audio is never re-encoded, so there is nothing to choose here — but people
-    /// look for the setting, so Dubplate says so plainly instead of hiding it.
-    public let downloadQualityDescription = "Original files, always. Dubplate never re-encodes your audio."
+    public var syncEnabled: Bool {
+        get { flag(Key.syncEnabled) }
+        set { set(newValue, forKey: Key.syncEnabled) }
+    }
+
+    /// A real constraint, not a preference: an album is a gigabyte, and
+    /// `SyncCoordinator.canDownloadNow` refuses every transfer while this is off.
+    public var allowsCellularDownloads: Bool {
+        get { flag(Key.cellularDownloads) }
+        set { set(newValue, forKey: Key.cellularDownloads) }
+    }
+
+    /// Loudness measurement is opt-in: it reads every file once, and a producer who
+    /// does not want the number should not pay for it.
+    public var measuresLoudness: Bool {
+        get { flag(Key.measuresLoudness) }
+        set { set(newValue, forKey: Key.measuresLoudness) }
+    }
+
+    public var appearance: Appearance {
+        get { Appearance(rawValue: values[Key.appearance] ?? "") ?? .system }
+        set { set(newValue.rawValue, forKey: Key.appearance) }
+    }
+
+    public var defaultPreviewMode: PreviewMode {
+        get { PreviewMode(rawValue: values[Key.defaultPreviewMode] ?? "") ?? .stream }
+        set { set(newValue.rawValue, forKey: Key.defaultPreviewMode) }
+    }
+
+    private func flag(_ key: String) -> Bool {
+        values[key] == "true"
+    }
+
+    private func set(_ value: Bool, forKey key: String) {
+        values[key] = String(value)
+        defaults.set(value, forKey: key)
+    }
+
+    private func set(_ value: String, forKey key: String) {
+        values[key] = value
+        defaults.set(value, forKey: key)
+    }
+
+    /// Audio is never re-encoded, so there is nothing to choose. Said in About
+    /// rather than dressed up as a setting that does nothing.
+    public static let audioPolicy = "Dubplate plays your original files and never re-encodes them."
 }

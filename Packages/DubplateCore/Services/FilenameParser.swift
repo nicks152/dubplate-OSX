@@ -16,6 +16,10 @@ public struct ParsedFilename: Hashable, Sendable {
     public var matchKey: String
     /// Everything that was stripped as a version marker, lowercased.
     public var versionTokens: [String]
+    /// True when the marker describes a different rendering — an instrumental, an
+    /// acapella, a radio edit — rather than a newer mix. Such a bounce is added as
+    /// a version but never becomes the current one.
+    public var isVariant: Bool
 
     public init(
         trackNumber: Int? = nil,
@@ -24,7 +28,8 @@ public struct ParsedFilename: Hashable, Sendable {
         versionOrdinal: Int? = nil,
         featuredArtists: String? = nil,
         matchKey: String = "",
-        versionTokens: [String] = []
+        versionTokens: [String] = [],
+        isVariant: Bool = false
     ) {
         self.trackNumber = trackNumber
         self.title = title
@@ -33,6 +38,7 @@ public struct ParsedFilename: Hashable, Sendable {
         self.featuredArtists = featuredArtists
         self.matchKey = matchKey
         self.versionTokens = versionTokens
+        self.isVariant = isVariant
     }
 }
 
@@ -45,18 +51,31 @@ public struct ParsedFilename: Hashable, Sendable {
 public enum FilenameParser {
 
     /// Words that mark a bounce revision rather than part of a song title.
-    /// Anything here is stripped off the end of a filename when working out the
-    /// song's name — so the list only contains words that are revision markers
-    /// first and song titles a distant second.
+    /// Anything here is stripped off the end of a filename unconditionally, so the
+    /// list only contains words nobody names a song after.
     static let versionKeywords: Set<String> = [
         "v", "ver", "version", "mix", "mixes", "master", "mastered", "mstr",
         "bounce", "take", "pass", "print", "rough", "demo", "sketch", "idea",
         "final", "alt", "alternate", "edit", "ref", "reference", "wip", "draft",
         "comp", "rev", "revision", "test", "tweak", "tweaks", "fix", "fixed",
+        "backup", "copy", "revised"
+    ]
+
+    /// Words that describe a bounce but make perfectly good song titles.
+    /// "Midnight drums.wav" is a mix of Midnight; "05 Bass.wav" is a track called
+    /// Bass. Only ever stripped when a real word survives behind them.
+    static let descriptorWords: Set<String> = [
         "drums", "drum", "vox", "vocal", "vocals", "bass", "keys", "gtr",
         "guitar", "synth", "stems", "inst", "instrumental", "acapella",
-        "backup", "copy", "revised", "clean", "dirty", "wet", "dry", "loud",
-        "quiet", "louder", "quieter", "radio", "extended"
+        "clean", "dirty", "wet", "dry", "loud", "quiet", "louder", "quieter",
+        "radio", "extended"
+    ]
+
+    /// A different rendering of the same song rather than a newer one. An
+    /// instrumental is worth keeping next to the vocal; it is never worth silently
+    /// becoming the mix everyone hears.
+    static let variantWords: Set<String> = [
+        "instrumental", "inst", "acapella", "clean", "radio", "extended", "stems"
     ]
 
     /// Ordinary English words that only count as revision markers when they sit in
@@ -69,6 +88,7 @@ public enum FilenameParser {
     /// Words that can trail a title without making it a different song. Used for
     /// matching tolerance only — matching proposes, it never renames anything.
     static let weakTokens: Set<String> = versionKeywords
+        .union(descriptorWords)
         .union(modifierWords)
         .union(["up", "down", "long", "short", "only"])
 
@@ -128,16 +148,21 @@ public enum FilenameParser {
         }
 
         var words = tokenize(working)
-        if let (number, remaining) = leadingTrackNumber(in: words) {
-            result.trackNumber = result.trackNumber ?? number
-            words = remaining
+        // A number lifted out of an "Artist - 02 - Title" segment is as explicit as
+        // a zero-padded one.
+        var numberNamesASlot = result.trackNumber != nil
+        if let lead = leadingTrackNumber(in: words) {
+            result.trackNumber = result.trackNumber ?? lead.number
+            words = lead.remaining
+            numberNamesASlot = numberNamesASlot || lead.namesASlot
         }
 
         var consumed: [String] = []
-        words = stripVersionTail(from: words, trackNumber: result.trackNumber, consumed: &consumed)
+        words = stripVersionTail(from: words, numberNamesASlot: numberNamesASlot, consumed: &consumed)
         consumed.append(contentsOf: groupVersionTokens)
 
         result.versionTokens = consumed.map { $0.lowercased() }
+        result.isVariant = result.versionTokens.contains { variantWords.contains($0) }
         if !consumed.isEmpty {
             result.versionLabel = presentableLabel(from: consumed)
             result.versionOrdinal = ordinal(in: consumed)
@@ -227,21 +252,29 @@ public enum FilenameParser {
         return separated.split(whereSeparator: { $0 == " " }).map(String.init)
     }
 
-    private static func leadingTrackNumber(in words: [String]) -> (Int, [String])? {
+    /// A leading number, and whether the filename actually named a track slot.
+    ///
+    /// "04 Midnight" names slot four and the number is not part of the title.
+    /// "24 Hours" is a song. The only reliable difference is the padding, so an
+    /// unpadded number is recorded for ordering and left in the title.
+    private static func leadingTrackNumber(
+        in words: [String]
+    ) -> (number: Int, remaining: [String], namesASlot: Bool)? {
         guard let first = words.first else { return nil }
         let lower = first.lowercased()
         if (lower == "track" || lower == "trk" || lower == "tk"), words.count > 1,
            let value = Int(words[1]), (1...99).contains(value) {
-            return (value, Array(words.dropFirst(2)))
+            return (value, Array(words.dropFirst(2)), true)
         }
         if let value = Int(first), first.count <= 3, (1...199).contains(value), words.count > 1 {
-            return (value, Array(words.dropFirst()))
+            let padded = first.hasPrefix("0")
+            return (value, padded ? Array(words.dropFirst()) : words, padded)
         }
         // "A1" / "B2" vinyl sides: keep the number, drop the side letter.
         if first.count == 2, let digit = first.last?.wholeNumberValue,
            let side = first.first, side.isLetter, ("a"..."d").contains(String(side).lowercased()),
            words.count > 1 {
-            return (digit, Array(words.dropFirst()))
+            return (digit, Array(words.dropFirst()), true)
         }
         return nil
     }
@@ -249,7 +282,7 @@ public enum FilenameParser {
     /// Peels version markers off the end of the word list, right to left.
     private static func stripVersionTail(
         from words: [String],
-        trackNumber: Int?,
+        numberNamesASlot: Bool,
         consumed: inout [String]
     ) -> [String] {
         var remaining = words
@@ -262,6 +295,12 @@ public enum FilenameParser {
                 continue
             }
             if versionKeywords.contains(lower) {
+                tail.insert(last, at: 0)
+                remaining.removeLast()
+                continue
+            }
+            // A descriptor is only a marker when a real word survives it.
+            if descriptorWords.contains(lower), remaining.count > 1 {
                 tail.insert(last, at: 0)
                 remaining.removeLast()
                 continue
@@ -285,9 +324,9 @@ public enum FilenameParser {
         if remaining.isEmpty, tail.count == 1, Int(tail[0]) != nil {
             return words
         }
-        // Never strip a name down to nothing unless a track number can stand in
-        // for it: "Drums idea.wav" is a track called "Drums idea".
-        if remaining.isEmpty, trackNumber == nil {
+        // Never strip a name down to nothing unless the filename actually named a
+        // slot: "Drums idea.wav" is a track called "Drums idea".
+        if remaining.isEmpty, !numberNamesASlot {
             return words
         }
         consumed.append(contentsOf: tail)

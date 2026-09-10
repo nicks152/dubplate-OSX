@@ -131,39 +131,48 @@ public struct VersionPickerSheet: View {
             }
 
             ForEach(track.orderedVersions) { version in
-                Button {
-                    onSelect(version)
-                } label: {
-                    HStack(spacing: DubplateLayout.m) {
-                        Image(systemName: playingVersionID == version.id ? "checkmark" : "")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(DubplateColor.playerPrimaryText)
-                            .frame(width: 16)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(version.listeningLabel)
-                                .font(DubplateType.rowTitle)
+                // Two separate controls, side by side. A Button inside another
+                // Button's label is not reliably tappable on iOS, and "Set as
+                // Current" is the only committing action the phone has.
+                HStack(spacing: DubplateLayout.m) {
+                    Button {
+                        onSelect(version)
+                    } label: {
+                        HStack(spacing: DubplateLayout.m) {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(DubplateColor.playerPrimaryText)
-                            Text(subtitle(for: version))
-                                .font(DubplateType.metadata)
-                                .foregroundStyle(DubplateColor.playerSecondaryText)
+                                .opacity(playingVersionID == version.id ? 1 : 0)
+                                .frame(width: 16)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(version.listeningLabel)
+                                    .font(DubplateType.rowTitle)
+                                    .foregroundStyle(DubplateColor.playerPrimaryText)
+                                Text(subtitle(for: version))
+                                    .font(DubplateType.metadata)
+                                    .foregroundStyle(DubplateColor.playerSecondaryText)
+                            }
+                            Spacer(minLength: 0)
                         }
-                        Spacer()
-                        if version.isCurrent {
-                            Text("Current")
-                                .font(DubplateType.label)
-                                .kerning(0.5)
-                                .foregroundStyle(DubplateColor.playerSecondaryText)
-                        } else {
-                            Button("Set as Current") { onSetCurrent(version) }
-                                .buttonStyle(.plain)
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(DubplateColor.playerSecondaryText)
-                        }
+                        .frame(minHeight: DubplateLayout.minimumTapTarget)
+                        .contentShape(Rectangle())
                     }
-                    .frame(minHeight: DubplateLayout.minimumTapTarget)
-                    .contentShape(Rectangle())
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Plays this mix from the same moment")
+
+                    if version.isCurrent {
+                        Text("Current")
+                            .font(DubplateType.label)
+                            .kerning(0.5)
+                            .foregroundStyle(DubplateColor.playerSecondaryText)
+                    } else {
+                        Button("Set as Current") { onSetCurrent(version) }
+                            .buttonStyle(.plain)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(DubplateColor.playerSecondaryText)
+                            .frame(minHeight: DubplateLayout.minimumTapTarget)
+                    }
                 }
-                .buttonStyle(.plain)
             }
             Spacer(minLength: 0)
         }
@@ -172,7 +181,8 @@ public struct VersionPickerSheet: View {
     }
 
     private func subtitle(for version: TrackVersion) -> String {
-        var parts = [version.shortName]
+        // The date is the point: "yesterday's mix" is how producers refer to these.
+        var parts = [version.shortName, Formatting.relativeDate(version.createdAt)]
         if let asset = version.audioAsset {
             parts.append(Formatting.duration(asset.duration))
             if !asset.compactFormat.isEmpty { parts.append(asset.compactFormat) }

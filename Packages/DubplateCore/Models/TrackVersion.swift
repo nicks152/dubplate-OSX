@@ -18,7 +18,7 @@ public final class TrackVersion {
 
     public var track: Track?
 
-    @Relationship(deleteRule: .nullify)
+    /// The inverse is declared on `AudioAsset.versions`.
     public var audioAsset: AudioAsset?
 
     public init(

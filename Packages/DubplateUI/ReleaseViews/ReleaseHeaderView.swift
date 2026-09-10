@@ -15,27 +15,41 @@ public struct ReleaseHeaderView: View {
         case centred
     }
 
-    private let release: Release
+    @Bindable private var release: Release
     private let layout: Layout
     private let artworkEdge: CGFloat
+    /// Editing belongs to the Mac. The phone shows a record; it does not rename one.
+    private let isEditable: Bool
     private let onPlay: () -> Void
     private let onShuffle: () -> Void
     private let onEditArtwork: (() -> Void)?
+    private let onCommit: (() -> Void)?
+
+    @FocusState private var focusedField: Field?
+
+    private enum Field: Hashable {
+        case title
+        case artist
+    }
 
     public init(
         release: Release,
         layout: Layout = .horizontal,
         artworkEdge: CGFloat = 220,
+        isEditable: Bool = false,
         onPlay: @escaping () -> Void,
         onShuffle: @escaping () -> Void,
-        onEditArtwork: (() -> Void)? = nil
+        onEditArtwork: (() -> Void)? = nil,
+        onCommit: (() -> Void)? = nil
     ) {
         self.release = release
         self.layout = layout
         self.artworkEdge = artworkEdge
+        self.isEditable = isEditable
         self.onPlay = onPlay
         self.onShuffle = onShuffle
         self.onEditArtwork = onEditArtwork
+        self.onCommit = onCommit
     }
 
     public var body: some View {
@@ -78,20 +92,46 @@ public struct ReleaseHeaderView: View {
             Text(release.releaseType.displayName)
                 .dubplateLabelStyle()
 
-            Text(release.title.isEmpty ? "Untitled" : release.title)
-                .dubplateDisplayStyle(size: layout == .centred ? 30 : 44)
-                .foregroundStyle(DubplateColor.primaryText)
-                .frame(maxWidth: .infinity, alignment: alignment == .center ? .center : .leading)
+            if isEditable {
+                // The title is the thing that turns a folder into a record, so it
+                // is editable exactly where you read it — no dialog, no inspector.
+                TextField("Untitled", text: $release.title)
+                    .textFieldStyle(.plain)
+                    .dubplateDisplayStyle(size: layout == .centred ? 30 : 44)
+                    .foregroundStyle(DubplateColor.primaryText)
+                    .focused($focusedField, equals: .title)
+                    .onSubmit { commit() }
 
-            Text(release.artistName)
-                .font(.system(size: layout == .centred ? 16 : 18, weight: .medium))
-                .foregroundStyle(DubplateColor.secondaryText)
+                TextField("Artist", text: $release.artistName)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: layout == .centred ? 16 : 18, weight: .medium))
+                    .foregroundStyle(DubplateColor.secondaryText)
+                    .focused($focusedField, equals: .artist)
+                    .onSubmit { commit() }
+            } else {
+                Text(release.title.isEmpty ? "Untitled" : release.title)
+                    .dubplateDisplayStyle(size: layout == .centred ? 30 : 44)
+                    .foregroundStyle(DubplateColor.primaryText)
+                    .frame(maxWidth: .infinity, alignment: alignment == .center ? .center : .leading)
+
+                Text(release.artistName)
+                    .font(.system(size: layout == .centred ? 16 : 18, weight: .medium))
+                    .foregroundStyle(DubplateColor.secondaryText)
+            }
 
             Text(metadataLine)
                 .font(DubplateType.metadata)
                 .foregroundStyle(DubplateColor.tertiaryText)
         }
         .multilineTextAlignment(alignment == .center ? .center : .leading)
+        .onChange(of: focusedField) { _, newValue in
+            if newValue == nil { commit() }
+        }
+    }
+
+    private func commit() {
+        release.updatedAt = Date()
+        onCommit?()
     }
 
     private var buttons: some View {
@@ -111,8 +151,11 @@ public struct ReleaseHeaderView: View {
         .labelStyle(.titleAndIcon)
     }
 
+    /// The release type is already set above this line; repeating it there was a
+    /// straight duplication.
     private var metadataLine: String {
-        var parts = [release.subtitleLine]
+        let count = release.trackCount
+        var parts = ["\(count) track\(count == 1 ? "" : "s")"]
         if let year = release.year { parts.append(String(year)) }
         if release.totalDuration > 0 {
             parts.append(Formatting.longDuration(release.totalDuration))

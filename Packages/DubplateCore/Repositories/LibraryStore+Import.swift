@@ -6,6 +6,8 @@ public struct ImportOutcome: Sendable {
     public var createdTracks: [UUID] = []
     public var addedVersions: [UUID] = []
     public var duplicateFilenames: [String] = []
+    /// Files whose bytes had gone missing and were put back by this import.
+    public var repairedFilenames: [String] = []
     public var failures: [DubplateError] = []
 
     public var isEmpty: Bool {
@@ -25,10 +27,16 @@ public struct ImportOutcome: Sendable {
                 parts.append("\(addedVersions.count) new versions")
             }
         }
-        if !duplicateFilenames.isEmpty {
-            parts.append("\(duplicateFilenames.count) already imported")
+        if !repairedFilenames.isEmpty {
+            parts.append("\(repairedFilenames.count) file\(repairedFilenames.count == 1 ? "" : "s") restored")
         }
-        return parts.joined(separator: " · ")
+        if !duplicateFilenames.isEmpty {
+            parts.append("\(duplicateFilenames.count) already on this release")
+        }
+        if !failures.isEmpty {
+            parts.append("\(failures.count) couldn’t be read")
+        }
+        return parts.isEmpty ? "Nothing to add" : parts.joined(separator: " · ")
     }
 }
 
@@ -63,8 +71,12 @@ public enum TrackDropChoice: String, CaseIterable, Identifiable, Sendable {
 extension LibraryStore {
 
     /// Builds a plan for a set of dropped URLs against a release.
+    ///
+    /// Folders are walked first: a bounce folder is the most obvious thing to drag
+    /// in, and a handler that only understands loose files refuses it silently.
     public func plan(for urls: [URL], in release: Release?) -> ImportPlan {
-        let candidates = urls.enumerated().map { ImportCandidate.make(url: $1, dropIndex: $0) }
+        let files = DroppedFiles.expand(urls)
+        let candidates = files.enumerated().map { ImportCandidate.make(url: $1, dropIndex: $0) }
         let existing = release.map { summaries(for: $0) } ?? []
         return ImportPlanner.plan(
             candidates: candidates,
@@ -107,12 +119,12 @@ extension LibraryStore {
                 setImportProgress(
                     ImportProgress(completed: completed, total: total, currentFilename: candidate.filename)
                 )
-                guard let ingested = await ingest(candidate, into: &outcome) else {
+                guard let ingested = await ingest(candidate, target: createdTrack, into: &outcome) else {
                     completed += 1
                     continue
                 }
                 if let track = createdTrack {
-                    let version = addVersion(from: ingested, to: track, makeCurrent: true)
+                    let version = addVersion(from: ingested, to: track)
                     outcome.addedVersions.append(version.id)
                 } else {
                     let track = makeTrack(
@@ -134,8 +146,8 @@ extension LibraryStore {
             )
             completed += 1
             guard let track = track(id: planned.match.trackID) else { continue }
-            guard let ingested = await ingest(planned.candidate, into: &outcome) else { continue }
-            let version = addVersion(from: ingested, to: track, makeCurrent: true)
+            guard let ingested = await ingest(planned.candidate, target: track, into: &outcome) else { continue }
+            let version = addVersion(from: ingested, to: track)
             outcome.addedVersions.append(version.id)
         }
 
@@ -176,7 +188,7 @@ extension LibraryStore {
 
         switch choice {
         case .createNewTrack:
-            guard let ingested = await ingest(candidate, into: &outcome) else { return outcome }
+            guard let ingested = await ingest(candidate, target: nil, into: &outcome) else { return outcome }
             let release = track.release
             let created = makeTrack(
                 named: candidate.parsed.title,
@@ -188,14 +200,14 @@ extension LibraryStore {
             outcome.createdTracks.append(created.id)
 
         case .addAsNewVersion:
-            guard let ingested = await ingest(candidate, into: &outcome) else { return outcome }
-            let version = addVersion(from: ingested, to: track, makeCurrent: true)
+            guard let ingested = await ingest(candidate, target: track, into: &outcome) else { return outcome }
+            let version = addVersion(from: ingested, to: track)
             outcome.addedVersions.append(version.id)
 
         case .replaceCurrentVersion:
-            guard let ingested = await ingest(candidate, into: &outcome) else { return outcome }
+            guard let ingested = await ingest(candidate, target: track, into: &outcome) else { return outcome }
             let previous = track.currentVersion
-            let version = addVersion(from: ingested, to: track, makeCurrent: true)
+            let version = addVersion(from: ingested, to: track, makeCurrent: true, force: true)
             outcome.addedVersions.append(version.id)
             if let previous {
                 delete(version: previous)
@@ -295,19 +307,61 @@ extension LibraryStore {
 
     // MARK: - Building blocks
 
-    private func ingest(_ candidate: ImportCandidate, into outcome: inout ImportOutcome) async -> IngestedFile? {
+    /// What an existing copy of these bytes means for this particular drop.
+    private enum ExistingBytes {
+        /// Nothing like it in the library.
+        case none
+        /// Already a version of the track being dropped on — genuinely a duplicate.
+        case duplicateOfTarget
+        /// Somewhere else in the library, and the file is present. The same master
+        /// can appear on a single and on the album; reuse it rather than storing
+        /// the bytes twice.
+        case reusable(AudioAsset)
+        /// The library knows this file but the bytes have gone. Put them back.
+        case repairable(AudioAsset)
+    }
+
+    private func ingest(
+        _ candidate: ImportCandidate,
+        target: Track?,
+        into outcome: inout ImportOutcome
+    ) async -> IngestedFile? {
         do {
             let ingested = try await ingestor.ingestAudio(from: candidate.url)
-            if let existing = existingAsset(withChecksum: ingested.checksum), !ingested.checksum.isEmpty {
-                // The identical file is already in the library. Keep the original
-                // and throw away the copy rather than storing the bytes twice.
+            switch existingBytes(checksum: ingested.checksum, target: target) {
+            case .none:
+                return ingested
+
+            case .duplicateOfTarget:
                 await ingestor.removeMedia(atRelativePath: ingested.relativePath)
                 outcome.duplicateFilenames.append(candidate.filename)
-                Log.media.info("Skipped duplicate import of \(candidate.filename, privacy: .public)")
-                _ = existing
+                Log.media.info("Already on this release: \(candidate.filename, privacy: .public)")
                 return nil
+
+            case .repairable(let asset):
+                // The error copy promises "drop the bounce in again to restore it",
+                // so it has to actually restore it.
+                do {
+                    try mediaStore.adopt(
+                        temporaryFile: mediaStore.url(forRelativePath: ingested.relativePath),
+                        asRelativePath: asset.relativePath
+                    )
+                    asset.localPresence = true
+                    asset.transferState = nil
+                    outcome.repairedFilenames.append(candidate.filename)
+                    Log.media.info("Restored missing media for \(candidate.filename, privacy: .public)")
+                } catch {
+                    Log.media.error("Could not restore media: \(String(describing: error))")
+                }
+                return nil
+
+            case .reusable(let asset):
+                await ingestor.removeMedia(atRelativePath: ingested.relativePath)
+                var reused = ingested
+                reused.assetID = asset.id
+                reused.relativePath = asset.relativePath
+                return reused
             }
-            return ingested
         } catch let error as DubplateError {
             outcome.failures.append(error)
             lastError = error
@@ -320,10 +374,16 @@ extension LibraryStore {
         }
     }
 
-    private func existingAsset(withChecksum checksum: String) -> AudioAsset? {
-        guard !checksum.isEmpty else { return nil }
+    private func existingBytes(checksum: String, target: Track?) -> ExistingBytes {
+        guard !checksum.isEmpty else { return .none }
         let descriptor = FetchDescriptor<AudioAsset>(predicate: #Predicate { $0.checksum == checksum })
-        return try? context.fetch(descriptor).first
+        guard let existing = try? context.fetch(descriptor).first else { return .none }
+
+        if !mediaStore.exists(relativePath: existing.relativePath) {
+            return .repairable(existing)
+        }
+        let alreadyOnTarget = (target?.versions ?? []).contains { $0.audioAsset?.id == existing.id }
+        return alreadyOnTarget ? .duplicateOfTarget : .reusable(existing)
     }
 
     private func makeTrack(
@@ -335,6 +395,7 @@ extension LibraryStore {
         let track = Track(
             title: title,
             artistName: release?.artistName ?? defaultArtistName,
+            featuredArtists: FilenameParser.parse(ingested.originalFilename).featuredArtists,
             trackNumber: number
         )
         context.insert(track)
@@ -348,19 +409,36 @@ extension LibraryStore {
         return track
     }
 
+    /// Adds a bounce as a version.
+    ///
+    /// It becomes the current mix unless its name says it is a different rendering
+    /// rather than a newer one: dropping a folder of instrumentals onto an album
+    /// must not silently replace every vocal.
     @discardableResult
-    private func addVersion(from ingested: IngestedFile, to track: Track, makeCurrent: Bool) -> TrackVersion {
-        let asset = AudioAsset(
-            id: ingested.assetID,
-            filename: mediaStore.url(forRelativePath: ingested.relativePath).lastPathComponent,
-            originalFilename: ingested.originalFilename,
-            relativePath: ingested.relativePath,
-            duration: ingested.info.duration,
-            format: ingested.info.format,
-            fileSize: ingested.fileSize,
-            checksum: ingested.checksum
-        )
-        context.insert(asset)
+    private func addVersion(
+        from ingested: IngestedFile,
+        to track: Track,
+        makeCurrent: Bool = true,
+        force: Bool = false
+    ) -> TrackVersion {
+        let asset: AudioAsset
+        if let reused = assetIfPresent(id: ingested.assetID) {
+            // The same master appearing on a second record: one file, two versions.
+            asset = reused
+        } else {
+            asset = AudioAsset(
+                id: ingested.assetID,
+                filename: mediaStore.url(forRelativePath: ingested.relativePath).lastPathComponent,
+                originalFilename: ingested.originalFilename,
+                relativePath: ingested.relativePath,
+                duration: ingested.info.duration,
+                format: ingested.info.format,
+                fileSize: ingested.fileSize,
+                checksum: ingested.checksum
+            )
+            asset.sourceFolder = ingested.sourceFolder
+            context.insert(asset)
+        }
 
         let parsed = FilenameParser.parse(ingested.originalFilename)
         let version = TrackVersion(
@@ -371,11 +449,16 @@ extension LibraryStore {
         context.insert(version)
         version.track = track
         if track.versions == nil { track.versions = [] }
-        if makeCurrent {
+        if makeCurrent, force || !parsed.isVariant || track.currentVersion == nil {
             track.makeCurrent(version)
         }
         track.updatedAt = Date()
         track.release?.updatedAt = track.updatedAt
         return version
+    }
+
+    private func assetIfPresent(id: UUID) -> AudioAsset? {
+        let descriptor = FetchDescriptor<AudioAsset>(predicate: #Predicate { $0.id == id })
+        return try? context.fetch(descriptor).first
     }
 }

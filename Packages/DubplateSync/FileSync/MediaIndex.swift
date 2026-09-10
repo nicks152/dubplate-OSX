@@ -53,6 +53,12 @@ public actor MediaIndex {
     private let url: URL
     private var descriptors: [UUID: MediaDescriptor] = [:]
     private var isLoaded = false
+    /// True when the file on disk could not be read. Nothing is written back until
+    /// something has been recorded, so an unreadable index is never overwritten with
+    /// an empty one before it can be rebuilt from the library.
+    private var isRecovering = false
+    private var isDirty = false
+    private var flushTask: Task<Void, Never>?
 
     public init(directory: URL) {
         self.url = directory.appending(path: "media-index.json", directoryHint: .notDirectory)
@@ -74,29 +80,50 @@ public actor MediaIndex {
     }
 
     public func record(_ descriptor: MediaDescriptor) {
-        load()
-        descriptors[descriptor.assetID] = descriptor
-        persist()
+        record([descriptor])
     }
 
+    /// Merges rather than replaces: a descriptor rebuilt from the library carries
+    /// `isUploaded == false`, and overwriting the real value with it re-uploaded
+    /// whole albums.
     public func record(_ newDescriptors: [MediaDescriptor]) {
         load()
         for descriptor in newDescriptors {
-            descriptors[descriptor.assetID] = descriptor
+            var merged = descriptor
+            if let existing = descriptors[descriptor.assetID] {
+                merged.isUploaded = existing.isUploaded || descriptor.isUploaded
+            }
+            descriptors[descriptor.assetID] = merged
         }
-        persist()
+        markDirty()
     }
 
     public func markUploaded(_ assetID: UUID) {
         load()
         descriptors[assetID]?.isUploaded = true
-        persist()
+        markDirty()
+    }
+
+    /// Used when an account changes: the bytes may not be in the new account.
+    public func markEverythingNotUploaded() {
+        load()
+        for key in descriptors.keys {
+            descriptors[key]?.isUploaded = false
+        }
+        markDirty()
     }
 
     public func remove(_ assetID: UUID) {
         load()
         descriptors[assetID] = nil
-        persist()
+        markDirty()
+    }
+
+    /// Writes anything outstanding now. Called before the process is likely to end.
+    public func flush() {
+        flushTask?.cancel()
+        flushTask = nil
+        if isDirty { persist() }
     }
 
     private func load() {

@@ -130,14 +130,25 @@ public final class LibraryStore {
         save()
     }
 
-    public func delete(release: Release) {
+    /// Deletes a release and returns the assets that went with it, so the caller
+    /// can clear the same bytes out of iCloud. Without that, deleting a record
+    /// leaves every master in the private database indefinitely — the person cannot
+    /// get their own unreleased music out of iCloud from inside the application.
+    @discardableResult
+    public func delete(release: Release) -> [UUID] {
+        var removed: [UUID] = []
         for track in release.orderedTracks {
-            deleteMedia(for: track)
+            removed.append(contentsOf: deleteMedia(for: track))
         }
-        if let artwork = release.artwork { deleteMedia(for: artwork) }
-        if let motion = release.animatedArtwork { deleteMedia(for: motion) }
+        if let artwork = release.artwork, deleteMedia(for: artwork) {
+            removed.append(artwork.id)
+        }
+        if let motion = release.animatedArtwork, deleteMedia(for: motion) {
+            removed.append(motion.id)
+        }
         context.delete(release)
         save()
+        return removed
     }
 
     public func markPlayed(release: Release, at date: Date = Date()) {
@@ -161,10 +172,23 @@ public final class LibraryStore {
 
     // MARK: - Tracks
 
-    public func delete(track: Track) {
+    @discardableResult
+    public func delete(track: Track) -> [UUID] {
         let release = track.release
-        deleteMedia(for: track)
+        let removed = deleteMedia(for: track)
         context.delete(track)
+        release?.normalizeOrder()
+        save()
+        return removed
+    }
+
+    /// Takes a track off a record without destroying anything: it goes back to the
+    /// Inbox, with every mix intact. This is what "remove from release" should mean.
+    public func removeFromRelease(track: Track) {
+        let release = track.release
+        release?.trackOrder.removeAll { $0 == track.id.uuidString }
+        track.release = nil
+        track.updatedAt = Date()
         release?.normalizeOrder()
         save()
     }
@@ -228,7 +252,7 @@ public final class LibraryStore {
         }
         let wasCurrent = track.currentVersionID == version.id
         if let asset = version.audioAsset {
-            deleteMedia(for: asset)
+            deleteMedia(for: asset, excluding: version)
         }
         context.delete(version)
         if wasCurrent {
@@ -243,21 +267,41 @@ public final class LibraryStore {
 
     // MARK: - Media cleanup
 
-    private func deleteMedia(for track: Track) {
+    @discardableResult
+    private func deleteMedia(for track: Track) -> [UUID] {
+        var removed: [UUID] = []
         for version in track.versions ?? [] {
-            if let asset = version.audioAsset { deleteMedia(for: asset) }
+            if let asset = version.audioAsset, deleteMedia(for: asset, excluding: version) {
+                removed.append(asset.id)
+            }
         }
-        if let canvas = track.canvas { deleteMedia(for: canvas) }
+        if let canvas = track.canvas, deleteMedia(for: canvas) {
+            removed.append(canvas.id)
+        }
+        return removed
     }
 
-    private func deleteMedia(for asset: AudioAsset) {
+    /// Removes the file behind an asset — unless another version still points at it.
+    /// The same master can appear on a single and on the album; deleting one record
+    /// must not silence the other.
+    @discardableResult
+    private func deleteMedia(for asset: AudioAsset, excluding version: TrackVersion?) -> Bool {
+        let versionID = version?.id
+        let othersRemain = (asset.versions ?? []).contains { $0.id != versionID }
+        guard !othersRemain else {
+            Log.media.info("Keeping shared media still used by another version")
+            return false
+        }
         let path = asset.relativePath
         Task { await ingestor.removeMedia(atRelativePath: path) }
+        return true
     }
 
-    private func deleteMedia(for asset: ArtworkAsset) {
+    @discardableResult
+    private func deleteMedia(for asset: ArtworkAsset) -> Bool {
         let path = asset.relativePath
         Task { await ingestor.removeMedia(atRelativePath: path) }
+        return true
     }
 
     // MARK: - Saving

@@ -16,9 +16,11 @@ public enum TrackOrdering {
 
     public static func signal(for candidates: [ImportCandidate]) -> Signal {
         if hasReliableNumbering(candidates) { return .filenameNumbers }
-        let indexes = Set(candidates.map(\.dropIndex))
-        if indexes.count == candidates.count, candidates.count > 1 { return .dropOrder }
-        return .filename
+        // A multi-file drag does not promise an order — the indexes are simply the
+        // order the URLs arrived in, which is why this used to look decisive and
+        // never was. Sort the way Finder displays instead, and say so.
+        if candidates.count > 1 { return .filename }
+        return .dropOrder
     }
 
     public static func infer(_ candidates: [ImportCandidate]) -> [ImportCandidate] {

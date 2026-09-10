@@ -32,10 +32,10 @@ public final class Release {
     @Relationship(deleteRule: .cascade, inverse: \Track.release)
     public var tracks: [Track]?
 
-    @Relationship(deleteRule: .nullify)
+    @Relationship(deleteRule: .nullify, inverse: \ArtworkAsset.coverForRelease)
     public var artwork: ArtworkAsset?
 
-    @Relationship(deleteRule: .nullify)
+    @Relationship(deleteRule: .nullify, inverse: \ArtworkAsset.motionForRelease)
     public var animatedArtwork: ArtworkAsset?
 
     public init(

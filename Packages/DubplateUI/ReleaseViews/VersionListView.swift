@@ -12,6 +12,7 @@ public struct VersionListView: View {
     private let onPlay: (TrackVersion) -> Void
     private let onMakeCurrent: (TrackVersion) -> Void
     private let onRename: ((TrackVersion) -> Void)?
+    private let onAnnotate: ((TrackVersion) -> Void)?
     private let onDelete: ((TrackVersion) -> Void)?
     private let onReveal: ((TrackVersion) -> Void)?
 
@@ -21,6 +22,7 @@ public struct VersionListView: View {
         onPlay: @escaping (TrackVersion) -> Void,
         onMakeCurrent: @escaping (TrackVersion) -> Void,
         onRename: ((TrackVersion) -> Void)? = nil,
+        onAnnotate: ((TrackVersion) -> Void)? = nil,
         onDelete: ((TrackVersion) -> Void)? = nil,
         onReveal: ((TrackVersion) -> Void)? = nil
     ) {
@@ -29,6 +31,7 @@ public struct VersionListView: View {
         self.onPlay = onPlay
         self.onMakeCurrent = onMakeCurrent
         self.onRename = onRename
+        self.onAnnotate = onAnnotate
         self.onDelete = onDelete
         self.onReveal = onReveal
     }
@@ -72,6 +75,7 @@ public struct VersionListView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Play \(version.displayName)")
+            .help("Plays this mix from where you are, so you can compare them")
 
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: DubplateLayout.s) {
@@ -89,6 +93,20 @@ public struct VersionListView: View {
                         .foregroundStyle(DubplateColor.tertiaryText)
                         .lineLimit(1)
                 }
+                if let source = sourceLine(for: version) {
+                    Text(source)
+                        .font(DubplateType.metadata)
+                        .foregroundStyle(DubplateColor.tertiaryText.opacity(0.8))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .textSelection(.enabled)
+                }
+                if let notes = version.notes, !notes.isEmpty {
+                    Text(notes)
+                        .font(DubplateType.metadata)
+                        .foregroundStyle(DubplateColor.secondaryText)
+                        .lineLimit(2)
+                }
             }
 
             Spacer(minLength: DubplateLayout.s)
@@ -105,6 +123,11 @@ public struct VersionListView: View {
                 }
                 if let onRename {
                     Button("Rename…") { onRename(version) }
+                }
+                if let onAnnotate {
+                    Button(version.notes?.isEmpty == false ? "Edit Note…" : "Add Note…") {
+                        onAnnotate(version)
+                    }
                 }
                 if let onReveal {
                     Button("Show in Finder") { onReveal(version) }
@@ -135,14 +158,25 @@ public struct VersionListView: View {
         .accessibilityElement(children: .combine)
     }
 
+    /// "Yesterday · 3:42 · 24-bit / 48 kHz · -10.8 LUFS"
+    ///
+    /// The date first, because "play me yesterday's mix" is how this list is
+    /// actually used.
     private func detailLine(for version: TrackVersion) -> String? {
-        var parts: [String] = []
+        var parts: [String] = [Formatting.relativeDate(version.createdAt)]
         if let asset = version.audioAsset {
             parts.append(Formatting.duration(asset.duration))
             if !asset.formatSummary.isEmpty { parts.append(asset.compactFormat) }
             if let loudness = asset.loudnessSummary { parts.append(loudness) }
         }
-        if let notes = version.notes, !notes.isEmpty { parts.append(notes) }
-        return parts.isEmpty ? nil : parts.joined(separator: "  ·  ")
+        return parts.joined(separator: "  ·  ")
+    }
+
+    /// The bounce's real name, and the folder it came from. Producers refer to
+    /// files by name out loud; the pretty label is not enough to identify one.
+    private func sourceLine(for version: TrackVersion) -> String? {
+        guard let asset = version.audioAsset, !asset.originalFilename.isEmpty else { return nil }
+        guard let folder = asset.sourceFolder, !folder.isEmpty else { return asset.originalFilename }
+        return "\(folder)/\(asset.originalFilename)"
     }
 }
