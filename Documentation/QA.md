@@ -10,7 +10,7 @@ What *has* been run, and what it establishes:
 
 | Check | Result | What it establishes |
 | --- | --- | --- |
-| `python3 Tools/swiftcheck.py` | 110 files, 16,640 lines, **0 errors, 0 warnings** | Delimiters balance; no duplicate declarations; every import matches a declared dependency; ~2,000 capitalised identifiers all resolve to a declaration in scope or a reviewed platform symbol; every `@Model` obeys CloudKit's rules, including that every relationship has an inverse; every `@Environment` read has a matching injection in each application, and every type injected is `@Observable`; no module reaches for a SwiftUI-only collection helper without importing SwiftUI; no force unwraps, `try!`, `as!`, `print(`, or oversized files |
+| `python3 Tools/swiftcheck.py` | 110 files, 16,644 lines, **0 errors, 0 warnings** | Delimiters balance; no duplicate declarations; every import matches a declared dependency; ~2,000 capitalised identifiers all resolve to a declaration in scope or a reviewed platform symbol; every `@Model` obeys CloudKit's rules, including that every relationship has an inverse; every `@Environment` read has a matching injection in each application, and every type injected is `@Observable`; no module reaches for a SwiftUI-only collection helper without importing SwiftUI; no Logger message is built by concatenation; no force unwraps, `try!`, `as!`, `print(`, or oversized files |
 | `python3 Tools/pbxcheck.py` | 95 objects, 4 targets, **0 problems** | The Xcode project parses as an OpenStep plist; every object reference resolves; every file reference exists on disk; every target has a sources phase and compiles at least one file |
 | `python3 Tools/heuristics_reference.py` | **35/35 cases pass** | The filename and version-matching rules behave as intended on a table of real bounce names |
 | BS.1770 coefficients, checked numerically | max error 4e-14 vs the published 48 kHz values | The K-weighting filters are correct, so loudness numbers are not all wrong by a constant |
@@ -21,8 +21,10 @@ Five of these checks were verified the only way a check can be: by deliberately
 breaking the code — deleting an `.environment()` injection, removing a relationship's
 `inverse:`, calling a method that does not exist, dropping `@Observable` from a type
 the environment carries, calling SwiftUI's `move(fromOffsets:toOffset:)` from the
-model layer — and confirming the checker named the exact line that would have failed.
-The last two were added after a real build produced exactly those errors. The last of those was added because critic
+model layer, joining two halves of a log message with `+` — and confirming the
+checker named the exact line that would have failed. The last three were added after
+a real build produced exactly those errors, which is the only reason they exist:
+each was a gap the checker did not know it had. The last of those was added because critic
 round 5 found two real compile errors that nothing here would have caught; it has
 since caught two more of the same kind.
 

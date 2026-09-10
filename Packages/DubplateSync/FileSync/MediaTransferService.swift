@@ -174,10 +174,14 @@ public actor MediaTransferService {
                 continue
             }
             guard await remoteFileExists(assetID) else {
-                Log.sync.error(
-                    "The index says \(descriptor.originalFilename, privacy: .public) is in iCloud "
-                    + "and iCloud disagrees. Keeping the local copy."
-                )
+                // One literal, not two joined by `+`. A Logger message is an
+                // `OSLogMessage` the compiler assembles from a single interpolated
+                // literal, so each value can carry its own privacy annotation.
+                // Two of them cannot be concatenated, and reaching for `+` to wrap
+                // a long line is the obvious thing to do — which is why the
+                // checker now catches it.
+                let name = descriptor.originalFilename
+                Log.sync.error("\(name, privacy: .public) is not in iCloud after all; keeping the local copy")
                 await index.markNotUploaded(assetID)
                 await onError?(DubplateError(.transferFailed, subject: descriptor.originalFilename))
                 continue

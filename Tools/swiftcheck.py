@@ -548,6 +548,38 @@ def check_own_members(module: Module, sources: dict[str, str], allow: set[str],
                     f"'{name}' calls '{called}()', which it does not declare"))
 
 
+LOG_CALL_RE = re.compile(
+    r"Log\.[a-z]+\.(?:error|info|debug|notice|warning|fault|log|critical|trace)\s*\("
+)
+
+
+def check_log_messages(body: str, path: str, offset: int, findings: list[Finding]) -> None:
+    """A Logger message is one literal, never two joined by `+`.
+
+    `Logger.error(_:)` takes an `OSLogMessage`, which the compiler assembles from a
+    single interpolated literal so each value can carry its own privacy annotation.
+    Two of them cannot be concatenated, and reaching for `+` to wrap a long line is
+    the obvious thing to do — so it is the obvious thing to catch.
+    """
+    for match in LOG_CALL_RE.finditer(body):
+        depth, index = 0, match.end() - 1
+        while index < len(body):
+            character = body[index]
+            if character == "(":
+                depth += 1
+            elif character == ")":
+                depth -= 1
+                if depth == 0:
+                    break
+            index += 1
+        argument = body[match.end():index]
+        if re.search(r'"\s*\n\s*\+|\+\s*"', argument):
+            line = offset + body[: match.start()].count("\n")
+            findings.append(Finding(
+                "error", rel(path), line, "log-concatenation",
+                "a Logger message is one literal; `+` cannot join two OSLogMessages"))
+
+
 # Methods that read like the standard library and are not: SwiftUI adds each of
 # these in an extension, so they exist in a file that imports SwiftUI and nowhere
 # else. Used in a module that has no business importing a UI framework, they
@@ -759,6 +791,11 @@ def main() -> int:
 
     for module in modules:
         collect_declarations(module, sources, findings)
+    for module in modules:
+        for path in module.files:
+            # The raw file, not `sources`: `strip_noise` blanks string literals,
+            # and the literals are the whole point of this one.
+            check_log_messages(open(path, encoding="utf-8").read(), path, 1, findings)
     check_environment_objects(modules, sources, findings)
     for module in modules:
         check_swiftui_only_members(module, sources, findings)
