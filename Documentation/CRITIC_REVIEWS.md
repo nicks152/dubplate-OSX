@@ -26,11 +26,11 @@ mechanical verification available. See `QA.md`.
 
 ## Round 1 — Product
 
-> *You are a ruthless consumer product leader reviewing Dubplate. Evaluate whether
-> this actually solves the stated producer problem. Identify unnecessary features,
-> missing workflows, friction, confusing terminology and anything that weakens the
-> core promise: "Hear your music like it's already out." Do not be polite. Prioritize
-> issues by severity.*
+> *You are a ruthless consumer product leader reviewing Dubplate. Evaluate whether this
+> actually solves the stated producer problem. Identify unnecessary features, missing
+> workflows, friction, confusing terminology and anything that weakens the core promise:
+> “Hear your music like it’s already out.” Do not be polite. Prioritize issues by
+> severity.*
 
 The reviewer returned seven severe findings, thirteen major, six minor, a delete
 list and a table of copy it judged off-voice. The summary it ended on was fair and
@@ -88,9 +88,11 @@ of a mix is read faster than a number, and the data was already being paid for.
 
 ## Round 2 — Design
 
-> *You are a world-class product designer at Apple. Review this application's
-> interface design for beauty, restraint, hierarchy, typography, colour, motion and
-> emotional impact. Identify anything generic, unpolished or visually inconsistent.*
+> *You are a world-class product designer with experience at Apple, Spotify and premium
+> creative applications. Review Dubplate visually and interactionally. Find anything that
+> feels like generic SwiftUI, SaaS software, developer UI or unfinished product. Focus on
+> hierarchy, spacing, typography, artwork presentation, navigation, animation and
+> emotional quality.*
 
 Given the eight design renderings in `design/renders/`, the design-system source and
 every screen's code. It found the most embarrassing defect in the project and eight
@@ -152,10 +154,11 @@ have to argue with it.
 
 ## Round 3 — Producer workflow
 
-> *You are a professional record producer who works daily in Pro Tools, Logic and
-> Ableton. You receive new bounces constantly and test albums repeatedly away from
-> the studio. Review Dubplate purely as a working producer. Find every unnecessary
-> click and every missing workflow.*
+> *You are a professional record producer who works daily in Pro Tools, Logic and Ableton.
+> You receive new bounces constantly and test albums repeatedly away from the studio.
+> Review Dubplate purely as a working producer. Find every unnecessary click and every
+> missing workflow. Focus heavily on bounce → Dubplate → iPhone → listening → replace mix
+> → listen again.*
 
 This round was asked to count interactions for six specific tasks. Its verdicts:
 
@@ -208,10 +211,10 @@ reports what it did — including doing nothing.
 
 ## Round 4 — Engineering
 
-> *You are a principal Apple platforms engineer. Review this codebase for
-> architecture problems, concurrency issues, sync bugs, memory problems, media
-> playback edge cases, CloudKit mistakes, persistence risks and maintainability
-> issues. Assume this app may eventually have tens of thousands of users.*
+> *You are a principal Apple platforms engineer. Review this codebase for architecture
+> problems, concurrency issues, sync bugs, memory problems, media playback edge cases,
+> CloudKit mistakes, persistence risks and maintainability issues. Assume this app may
+> eventually have tens of thousands of users.*
 
 The most valuable round. Seven severe findings, seventeen major, twelve minor, and a
 separate list of things that would not compile.
@@ -288,9 +291,11 @@ column later.
 
 ## Round 5 — Failure testing
 
-> *You are a QA engineer whose entire job is breaking software. Try to break
-> Dubplate. Find crashes, data loss, sync failures, race conditions, playback bugs,
-> file handling errors, edge cases and performance problems.*
+> *You are a hostile QA engineer trying to break Dubplate. Test large WAV files, missing
+> files, failed iCloud sync, airplane mode, interrupted downloads, app termination,
+> audio-route changes, corrupt artwork, malformed metadata, rapid skipping, repeated
+> imports, duplicate tracks and concurrent Mac/iPhone edits. Find failures rather than
+> confirming success.*
 
 The hardest round, and the one that paid for itself several times over. It returned
 twenty-six findings and, unprompted, a numbered fix order: *§0 (it does not compile) →
