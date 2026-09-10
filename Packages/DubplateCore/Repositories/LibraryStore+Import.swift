@@ -334,7 +334,8 @@ extension LibraryStore {
     ) async -> IngestedFile? {
         do {
             let ingested = try await ingestor.ingestAudio(from: candidate.url)
-            switch existingBytes(checksum: ingested.checksum, target: target) {
+            let incomingFile = mediaStore.url(forRelativePath: ingested.relativePath)
+            switch existingBytes(checksum: ingested.checksum, incomingFile: incomingFile, target: target) {
             case .none:
                 return ingested
 
@@ -349,7 +350,7 @@ extension LibraryStore {
                 // so it has to actually restore it.
                 do {
                     try mediaStore.adopt(
-                        temporaryFile: mediaStore.url(forRelativePath: ingested.relativePath),
+                        temporaryFile: incomingFile,
                         asRelativePath: asset.relativePath
                     )
                     asset.localPresence = true
@@ -380,14 +381,40 @@ extension LibraryStore {
         }
     }
 
-    private func existingBytes(checksum: String, target: Track?) -> ExistingBytes {
+    /// Decides what an existing copy of these bytes means for this drop.
+    ///
+    /// A signature match is only a candidate. Two mixes of the same song have the
+    /// same length and near-identical heads and tails, so concluding identity from
+    /// the signature discarded the producer's new mix and told them Dubplate already
+    /// had it. Every branch that acts on identity is confirmed byte-for-byte first.
+    private func existingBytes(
+        checksum: String,
+        incomingFile: URL,
+        target: Track?
+    ) -> ExistingBytes {
         guard !checksum.isEmpty else { return .none }
         let descriptor = FetchDescriptor<AudioAsset>(predicate: #Predicate { $0.checksum == checksum })
         guard let existing = try? context.fetch(descriptor).first else { return .none }
 
-        if !mediaStore.exists(relativePath: existing.relativePath) {
+        let existingFile = mediaStore.url(forRelativePath: existing.relativePath)
+        guard mediaStore.exists(relativePath: existing.relativePath) else {
+            // The library knows this signature but the bytes are gone. There is
+            // nothing to compare against, so this can only be a repair if the
+            // *description* matches too.
+            guard existing.fileSize == ((try? Checksum.fileSize(of: incomingFile)) ?? -1),
+                  existing.originalFilename == incomingFile.lastPathComponent
+            else {
+                return .none
+            }
             return .repairable(existing)
         }
+
+        guard Checksum.areIdentical(existingFile, incomingFile) else {
+            // Same signature, different audio: a new mix, and an ordinary import.
+            Log.media.info("Signature collision between two different files; importing both")
+            return .none
+        }
+
         let alreadyOnTarget = (target?.versions ?? []).contains { $0.audioAsset?.id == existing.id }
         return alreadyOnTarget ? .duplicateOfTarget : .reusable(existing)
     }

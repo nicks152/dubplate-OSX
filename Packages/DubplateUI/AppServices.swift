@@ -83,6 +83,7 @@ public final class AppServices {
             MediaAvailability.refresh(release, using: mediaStore)
         }
         if mediaStore.exists(relativePath: item.relativePath) {
+            analyser.reconsiderSkipped()
             player.resumeAfterDownload()
         } else if player.awaitingDownloadOf?.id == item.id {
             player.abandonPendingItem()

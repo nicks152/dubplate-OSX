@@ -19,7 +19,14 @@ public struct MediaDescriptor: Codable, Hashable, Sendable {
     public var originalFilename: String
     public var checksum: String
     public var fileSize: Int64
-    /// Set once the bytes are known to be in CloudKit.
+    /// Set once the *description* of this file has reached CloudKit. Says nothing
+    /// about the bytes.
+    public var isDescribed: Bool
+    /// Set once the bytes themselves are known to be in CloudKit.
+    ///
+    /// These are two different record types on two different code paths, and
+    /// conflating them meant a file whose description had synced was treated as
+    /// safely backed up — after which "Remove Download" deleted the only copy.
     public var isUploaded: Bool
 
     public init(
@@ -29,6 +36,7 @@ public struct MediaDescriptor: Codable, Hashable, Sendable {
         originalFilename: String,
         checksum: String,
         fileSize: Int64,
+        isDescribed: Bool = false,
         isUploaded: Bool = false
     ) {
         self.assetID = assetID
@@ -37,6 +45,7 @@ public struct MediaDescriptor: Codable, Hashable, Sendable {
         self.originalFilename = originalFilename
         self.checksum = checksum
         self.fileSize = fileSize
+        self.isDescribed = isDescribed
         self.isUploaded = isUploaded
     }
 
@@ -74,9 +83,16 @@ public actor MediaIndex {
         return descriptors[assetID]
     }
 
+    /// Files whose bytes are not in CloudKit.
     public func pendingUploads() -> [MediaDescriptor] {
         load()
         return descriptors.values.filter { !$0.isUploaded }
+    }
+
+    /// Files whose description is not in CloudKit.
+    public func pendingDescriptions() -> [MediaDescriptor] {
+        load()
+        return descriptors.values.filter { !$0.isDescribed }
     }
 
     public func record(_ descriptor: MediaDescriptor) {
@@ -92,15 +108,30 @@ public actor MediaIndex {
             var merged = descriptor
             if let existing = descriptors[descriptor.assetID] {
                 merged.isUploaded = existing.isUploaded || descriptor.isUploaded
+                merged.isDescribed = existing.isDescribed || descriptor.isDescribed
             }
             descriptors[descriptor.assetID] = merged
         }
         markDirty()
     }
 
+    /// The bytes are in CloudKit.
     public func markUploaded(_ assetID: UUID) {
         load()
         descriptors[assetID]?.isUploaded = true
+        markDirty()
+    }
+
+    public func markNotUploaded(_ assetID: UUID) {
+        load()
+        descriptors[assetID]?.isUploaded = false
+        markDirty()
+    }
+
+    /// The description is in CloudKit. Not the same thing, and not sufficient.
+    public func markDescribed(_ assetID: UUID) {
+        load()
+        descriptors[assetID]?.isDescribed = true
         markDirty()
     }
 
@@ -109,6 +140,7 @@ public actor MediaIndex {
         load()
         for key in descriptors.keys {
             descriptors[key]?.isUploaded = false
+            descriptors[key]?.isDescribed = false
         }
         markDirty()
     }

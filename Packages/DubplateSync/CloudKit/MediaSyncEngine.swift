@@ -91,8 +91,8 @@ public actor MediaSyncEngine {
         engine = CKSyncEngine(engineConfiguration)
         Log.sync.info("Media sync engine started")
 
-        // Anything that never finished uploading gets re-queued on every launch.
-        let pending = await index.pendingUploads()
+        // Any description that never went up is re-queued on every launch.
+        let pending = await index.pendingDescriptions()
         if !pending.isEmpty {
             queueUploads(pending.map(\.assetID))
         }
@@ -203,8 +203,10 @@ extension MediaSyncEngine: CKSyncEngineDelegate {
         case .sentRecordZoneChanges(let sent):
             for saved in sent.savedRecords {
                 if let assetID = UUID(uuidString: saved.recordID.recordName) {
-                    await index.markUploaded(assetID)
-                    await onAvailabilityChanged?(assetID, .available)
+                    // The *description* went up. The bytes are a separate record on
+                    // a separate path, and saying otherwise here is how a master
+                    // gets deleted.
+                    await index.markDescribed(assetID)
                 }
             }
             for failure in sent.failedRecordSaves {
@@ -317,7 +319,7 @@ extension MediaSyncEngine: CKSyncEngineDelegate {
             // Another device described this asset first. Descriptions are immutable
             // once written — the record name is the asset identifier and an asset's
             // contents never change — so the server's copy is already correct.
-            await index.markUploaded(assetID)
+            await index.markDescribed(assetID)
         case .zoneNotFound, .userDeletedZone:
             let zoneID = CKRecordZone.ID(zoneName: configuration.zoneName)
             syncEngine.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: zoneID))])

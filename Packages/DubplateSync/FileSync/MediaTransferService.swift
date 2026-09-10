@@ -152,17 +152,43 @@ public actor MediaTransferService {
         }
     }
 
-    /// Deletes local bytes but never the cloud copy. Removing a download must never
-    /// be able to lose a mix.
+    /// Deletes local bytes but never the cloud copy.
+    ///
+    /// The local flag is not enough to act on: it can be wrong, and being wrong here
+    /// destroys a master. Every file is confirmed present in CloudKit — by asking
+    /// CloudKit — before anything is unlinked.
     public func removeLocalCopies(_ assetIDs: [UUID]) async {
         for assetID in assetIDs {
-            guard let descriptor = await index.descriptor(for: assetID), descriptor.isUploaded else {
-                // Never delete the only copy of something that is not in iCloud.
+            guard let descriptor = await index.descriptor(for: assetID) else { continue }
+            guard descriptor.isUploaded else {
                 Log.sync.info("Refusing to remove a local file that has not been uploaded")
+                continue
+            }
+            guard await remoteFileExists(assetID) else {
+                Log.sync.error(
+                    "The index says \(descriptor.originalFilename, privacy: .public) is in iCloud "
+                    + "and iCloud disagrees. Keeping the local copy."
+                )
+                await index.markNotUploaded(assetID)
+                await onError?(DubplateError(.transferFailed, subject: descriptor.originalFilename))
                 continue
             }
             try? mediaStore.remove(relativePath: descriptor.relativePath)
             await onAvailabilityChanged?(assetID, .cloudOnly)
+        }
+    }
+
+    /// Asks CloudKit whether the file record is actually there, without fetching it.
+    private func remoteFileExists(_ assetID: UUID) async -> Bool {
+        let recordID = CKRecord.ID(recordName: assetID.uuidString, zoneID: zoneID)
+        do {
+            let results = try await database.records(for: [recordID], desiredKeys: [])
+            if case .success = results[recordID] { return true }
+            return false
+        } catch {
+            // Cannot confirm, so do not delete.
+            Log.sync.error("Could not confirm the iCloud copy: \(String(describing: error))")
+            return false
         }
     }
 

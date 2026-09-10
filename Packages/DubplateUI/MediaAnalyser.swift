@@ -35,6 +35,15 @@ public final class MediaAnalyser {
         work = nil
     }
 
+    /// Assets that cannot be analysed this session — not downloaded, or unreadable.
+    ///
+    /// Without this the pass re-fetched the same rows forever: the predicate is
+    /// "has no waveform", and a file that is not on this device can never get one.
+    /// On a phone holding a synced catalogue and no audio that was a fully
+    /// synchronous main-actor loop with no suspension point, which is a watchdog
+    /// kill within seconds of launch.
+    private var skipped: Set<UUID> = []
+
     private func run(limit: Int) async {
         let wantsLoudness = settings.measuresLoudness
         var descriptor = FetchDescriptor<AudioAsset>(
@@ -44,21 +53,34 @@ public final class MediaAnalyser {
         )
         // Without a limit this hydrates every unanalysed asset in the library on the
         // main actor to take the first forty.
-        descriptor.fetchLimit = limit
-        let assets = (try? context.fetch(descriptor)) ?? []
+        descriptor.fetchLimit = limit + skipped.count
+        let assets = ((try? context.fetch(descriptor)) ?? [])
+            .filter { !skipped.contains($0.id) }
+            .prefix(limit)
         guard !assets.isEmpty else { return }
 
+        var analysed = 0
         for asset in assets {
             if Task.isCancelled { return }
-            guard !asset.isDeleted,
-                  mediaStore.exists(relativePath: asset.relativePath)
-            else { continue }
+            // Yield on every asset, including the ones that are skipped.
+            await Task.yield()
+            guard !asset.isDeleted else { continue }
+            guard mediaStore.exists(relativePath: asset.relativePath) else {
+                skipped.insert(asset.id)
+                continue
+            }
 
             let url = mediaStore.url(forRelativePath: asset.relativePath)
             if asset.waveformPeaks == nil {
                 if let peaks = try? await WaveformGenerator().peaks(forFileAt: url), !peaks.isEmpty {
                     guard !asset.isDeleted else { continue }
                     asset.waveformPeaks = peaks
+                    analysed += 1
+                } else {
+                    // A file the system cannot read will never produce peaks; one of
+                    // them must not keep the pass alive forever.
+                    skipped.insert(asset.id)
+                    continue
                 }
             }
             if wantsLoudness, asset.integratedLoudness == nil {
@@ -70,13 +92,17 @@ public final class MediaAnalyser {
                 }
             }
             try? context.save()
-            // Give the main actor room between files: this is background work and
-            // must never make a scroll stutter.
-            await Task.yield()
         }
-        // Keep going: analysis used to stop silently after the first batch.
-        if !Task.isCancelled {
+        // Keep going while progress is being made, and stop the moment it is not.
+        if analysed > 0, !Task.isCancelled {
             await run(limit: limit)
         }
+    }
+
+    /// Called when a download lands, so files that were skipped get another go.
+    public func reconsiderSkipped() {
+        guard !skipped.isEmpty else { return }
+        skipped.removeAll()
+        analysePending()
     }
 }
