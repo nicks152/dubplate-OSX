@@ -27,8 +27,19 @@ public actor MediaTransferService {
     static let fileField = "file"
     static let assetIDField = "assetID"
 
-    private let container: CKContainer
-    private let database: CKDatabase
+    /// Built on first use, never at init — see `CloudAccount.containerIdentifier`
+    /// for why holding a `CKContainer` is enough to crash a build without iCloud.
+    /// Everything that reaches for it is already behind an account check that
+    /// answers `notConfigured` in that case, so it is never built at all there.
+    private let containerIdentifier: String
+    private var cachedDatabase: CKDatabase?
+    private var database: CKDatabase {
+        if let cachedDatabase { return cachedDatabase }
+        let made = CKContainer(identifier: containerIdentifier).privateCloudDatabase
+        cachedDatabase = made
+        return made
+    }
+
     private let zoneID: CKRecordZone.ID
     private let mediaStore: MediaStore
     private let index: MediaIndex
@@ -47,8 +58,7 @@ public actor MediaTransferService {
         mediaStore: MediaStore,
         index: MediaIndex
     ) {
-        self.container = CKContainer(identifier: containerIdentifier)
-        self.database = container.privateCloudDatabase
+        self.containerIdentifier = containerIdentifier
         self.zoneID = CKRecordZone.ID(zoneName: zoneName)
         self.mediaStore = mediaStore
         self.index = index

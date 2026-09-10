@@ -49,7 +49,6 @@ public actor MediaSyncEngine {
     static let recordType = "DubplateMedia"
 
     private let configuration: Configuration
-    private let container: CKContainer
     private let mediaStore: MediaStore
     private let index: MediaIndex
     private var engine: CKSyncEngine?
@@ -63,7 +62,6 @@ public actor MediaSyncEngine {
 
     public init(configuration: Configuration, mediaStore: MediaStore, index: MediaIndex) {
         self.configuration = configuration
-        self.container = CKContainer(identifier: configuration.containerIdentifier)
         self.mediaStore = mediaStore
         self.index = index
     }
@@ -82,6 +80,10 @@ public actor MediaSyncEngine {
 
     public func start() async {
         guard engine == nil else { return }
+        // Built here rather than held as a property: constructing a `CKContainer`
+        // reads the process entitlements and crashes without them. `start()` is
+        // only reached once the account has answered that it can sync.
+        let container = CKContainer(identifier: configuration.containerIdentifier)
         var engineConfiguration = CKSyncEngine.Configuration(
             database: container.privateCloudDatabase,
             stateSerialization: loadState(),

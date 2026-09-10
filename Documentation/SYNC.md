@@ -143,6 +143,21 @@ On top of that flag:
 So the button can never destroy the only copy of a mix, and being wrong about the
 index costs a wasted request rather than a master.
 
+## Nothing builds a CKContainer until it is used
+
+`CKContainer(identifier:)` reads the process's entitlements while it is being
+constructed and calls `os_crash` when they are missing. Holding one as a stored
+property is therefore enough to kill an application built without iCloud before a
+line of its interface has run — and three types did exactly that, `CloudAccount`
+among them, which `SyncCoordinator` creates in a property initialiser.
+
+Every container is now built at the point of use, behind
+`DubplateSchema.hasCloudKitEntitlement` or an account state that already answers
+`notConfigured`. The same is true of the mirrored store: `containerWithFallback`
+checks the entitlement rather than trying and catching, because there is nothing to
+catch — SwiftData constructs the container successfully and Core Data crashes later,
+on its own queue.
+
 ## Turning on iCloud sync
 
 Dubplate ships with sync **off**, because a free Apple Developer account cannot sign

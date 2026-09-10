@@ -27,10 +27,16 @@ public enum CloudAccountState: String, Sendable {
 
 /// Asks CloudKit about the account, and watches for it changing.
 public struct CloudAccount: Sendable {
-    private let container: CKContainer
+    /// The identifier, not a container. `CKContainer(identifier:)` reads the
+    /// process's entitlements as it is constructed and calls `os_crash` when they
+    /// are missing — so merely holding one as a stored property is enough to kill
+    /// an application built without iCloud, before a single line of the interface
+    /// has run. Every container in Dubplate is now built at the point of use,
+    /// behind a check.
+    private let containerIdentifier: String
 
     public init(containerIdentifier: String = DubplateSchema.cloudContainerIdentifier) {
-        self.container = CKContainer(identifier: containerIdentifier)
+        self.containerIdentifier = containerIdentifier
     }
 
     public func state() async -> CloudAccountState {
@@ -38,6 +44,7 @@ public struct CloudAccount: Sendable {
         // entitlement fails the same way the mirrored store does, on a queue of its
         // own where nothing can catch it.
         guard DubplateSchema.hasCloudKitEntitlement else { return .notConfigured }
+        let container = CKContainer(identifier: containerIdentifier)
         do {
             switch try await container.accountStatus() {
             case .available: return .available
