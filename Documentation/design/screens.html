@@ -1,0 +1,397 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Dubplate — design renderings</title>
+<!--
+  These are NOT screenshots of the running application. There is no Apple toolchain
+  in the environment this repository was built in, so nothing has been launched.
+
+  Each screen below is redrawn in HTML from the values in
+  Packages/DubplateUI/DesignSystem — the same palette, the same spacing scale, the
+  same type sizes, the same corner radii, the same placeholder-cover hash — so the
+  hierarchy, density and proportions can be judged. Behaviour, real type rendering
+  and system controls are not represented.
+
+  Regenerate the images with: python3 Tools/render_design.py
+-->
+<style>
+  /* ---- DubplateColor (dark appearance) ---- */
+  :root {
+    --ground: #0B0B0C;
+    --raised: #141416;
+    --sunken: #1C1C1F;
+    --hairline: rgba(244,243,241,0.10);
+    --primary: #F4F3F1;
+    --secondary: rgba(244,243,241,0.60);
+    --tertiary: rgba(244,243,241,0.38);
+    --alert: #E0684E;
+    --player-ground: #0B0B0C;
+    --player-primary: #F4F3F1;
+    --player-secondary: rgba(245,243,241,0.62);
+    /* ---- DubplateLayout ---- */
+    --xs: 4px; --s: 8px; --m: 12px; --l: 16px; --xl: 24px; --xxl: 32px; --xxxl: 48px;
+    --artwork-radius: 6px; --large-artwork-radius: 10px; --control-radius: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #2a2a2e; font-family: -apple-system, "SF Pro Text", "Helvetica Neue", Inter, system-ui, sans-serif;
+    padding: 40px; display: flex; flex-wrap: wrap; gap: 40px; align-items: flex-start;
+  }
+  .caption { color: #999; font-size: 12px; margin-bottom: 8px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .screen { background: var(--ground); color: var(--primary); overflow: hidden; position: relative; }
+  .mac { width: 1180px; height: 760px; border-radius: 10px; display: flex; }
+  .phone { width: 393px; height: 852px; border-radius: 44px; border: 1px solid rgba(255,255,255,0.12); }
+
+  /* ---- type: DubplateType ---- */
+  .display-44 { font-size: 44px; font-weight: 600; letter-spacing: -0.8px; line-height: 1.05; }
+  .display-30 { font-size: 30px; font-weight: 600; letter-spacing: -0.5px; line-height: 1.08; }
+  .display-26 { font-size: 26px; font-weight: 600; letter-spacing: -0.4px; line-height: 1.1; }
+  .display-22 { font-size: 22px; font-weight: 600; letter-spacing: -0.3px; }
+  .label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.1px; color: var(--tertiary); }
+  .card-title { font-size: 14px; font-weight: 500; }
+  .row-title { font-size: 14px; }
+  .row-sub { font-size: 13px; color: var(--secondary); }
+  .meta { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--tertiary); }
+  .np-title { font-size: 22px; font-weight: 600; letter-spacing: -0.4px; }
+  .np-artist { font-size: 17px; color: var(--player-secondary); }
+
+  /* ---- artwork ---- */
+  .art { border-radius: var(--artwork-radius); position: relative; overflow: hidden;
+         box-shadow: 0 4px 10px rgba(0,0,0,0.16); outline: 1px solid var(--hairline); outline-offset: -1px; }
+  .art .name { position: absolute; left: 8%; bottom: 8%; right: 8%; color: rgba(255,255,255,0.82);
+                font-weight: 600; text-transform: uppercase; line-height: 1.15; }
+
+  /* ---- mac chrome ---- */
+  .sidebar { width: 232px; background: var(--raised); border-right: 1px solid var(--hairline);
+             padding: var(--l) var(--s); display: flex; flex-direction: column; flex: none; }
+  .sidebar .section { font-size: 11px; font-weight: 600; color: var(--tertiary); padding: 10px var(--m) 6px; letter-spacing: 0.02em; }
+  .sidebar .item { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--secondary);
+                   padding: 6px var(--m); border-radius: 6px; }
+  .sidebar .item.on { background: var(--sunken); color: var(--primary); }
+  .sidebar .item .glyph { width: 16px; opacity: 0.7; font-size: 12px; }
+  .detail { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .toolbar { height: 46px; display: flex; align-items: center; justify-content: space-between;
+             padding: 0 var(--xl); border-bottom: 1px solid var(--hairline); flex: none; }
+  .mini { height: 52px; background: var(--raised); border-top: 1px solid var(--hairline);
+          display: flex; align-items: center; gap: var(--m); padding: 0 var(--m); flex: none; }
+  .transport { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--primary); }
+  .playbtn { width: 34px; height: 34px; border-radius: 50%; background: var(--primary); color: var(--ground);
+             display: flex; align-items: center; justify-content: center; font-size: 12px; }
+
+  /* ---- library grid ---- */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 32px 20px; }
+  .card .art { width: 100%; aspect-ratio: 1; margin-bottom: var(--m); }
+  .card .t { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card .a { font-size: 13px; color: var(--secondary); }
+  .card .m { font-size: 12px; color: var(--tertiary); }
+
+  /* ---- track list ---- */
+  .track { display: flex; align-items: center; gap: var(--m); height: 34px; padding: 0 var(--s); border-radius: 6px; }
+  .track.sel { background: var(--sunken); }
+  .track .num { width: 26px; text-align: center; font-size: 12px; color: var(--tertiary); font-variant-numeric: tabular-nums; }
+  .track .name { flex: 1; font-size: 14px; }
+  .track .dur { font-size: 12px; color: var(--tertiary); font-variant-numeric: tabular-nums; }
+  .pill { font-size: 10px; font-weight: 600; letter-spacing: 0.4px; color: var(--secondary);
+          background: var(--sunken); border-radius: 99px; padding: 2px 6px; }
+  .bars { display: flex; align-items: flex-end; gap: 1.5px; height: 10px; width: 10px; }
+  .bars i { width: 2px; background: var(--primary); border-radius: 1px; display: block; }
+
+  /* ---- buttons ---- */
+  .filled { height: 32px; padding: 0 16px; border-radius: 99px; background: var(--primary); color: var(--ground);
+            font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; }
+  .quiet { height: 32px; padding: 0 16px; border-radius: 99px; background: var(--sunken); color: var(--primary);
+           font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; }
+
+  /* ---- inspector ---- */
+  .inspector { width: 320px; background: var(--raised); border-left: 1px solid var(--hairline);
+               padding: var(--xl); display: flex; flex-direction: column; gap: var(--xl); flex: none; overflow: hidden; }
+  .field { display: flex; flex-direction: column; gap: var(--xs); }
+  .field .box { background: var(--sunken); border-radius: var(--control-radius); padding: 8px 12px; font-size: 14px; }
+  .rule { height: 1px; background: var(--hairline); }
+
+  /* ---- scrubber ---- */
+  .wave { display: flex; align-items: center; gap: 1px; height: 26px; }
+  .wave i { width: 2px; border-radius: 1px; display: block; }
+  .times { display: flex; justify-content: space-between; font-size: 12px; font-variant-numeric: tabular-nums; margin-top: 8px; }
+
+  .modepicker { display: inline-flex; gap: 2px; padding: 3px; border-radius: 99px;
+                background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.08); }
+  .modepicker span { font-size: 11px; font-weight: 500; letter-spacing: 0.3px; padding: 0 12px; height: 26px;
+                     display: flex; align-items: center; border-radius: 99px; color: var(--player-secondary); }
+  .modepicker span.on { background: rgba(255,255,255,0.16); color: var(--player-primary); }
+</style>
+<body></body>
+<script>
+// MonogramArtwork: the same djb2 hash over the title that the app uses, so a
+// placeholder cover here is the placeholder cover the app would draw.
+function shades(title) {
+  let hash = 5381n;
+  for (const byte of new TextEncoder().encode(title || 'Untitled')) {
+    hash = BigInt.asUintN(64, hash * 33n + BigInt(byte));
+  }
+  const base = Number(hash % 26n) / 100 + 0.10;
+  const g = v => `rgb(${Math.round(v*255)},${Math.round(v*255)},${Math.round(v*255)})`;
+  return [g(base + 0.16), g(base)];
+}
+function art(title, size, radius) {
+  const [a, b] = shades(title);
+  const edge = typeof size === 'number' ? size + 'px' : size;
+  const px = typeof size === 'number' ? size : 200;
+  return `<div class="art" style="width:${edge};height:${edge};border-radius:${radius||6}px;
+    background:linear-gradient(135deg, ${a}, ${b})">
+    <div class="name" style="font-size:${Math.max(9, px*0.088)}px;letter-spacing:${px*0.006}px">${title}</div></div>`;
+}
+function waveform(count, progress, colorOn, colorOff) {
+  let out = '';
+  for (let i = 0; i < count; i++) {
+    const t = i / count;
+    const h = 3 + Math.abs(Math.sin(t * 11) * Math.cos(t * 3.3) + Math.sin(t * 27) * 0.35) * 21;
+    out += `<i style="height:${h.toFixed(1)}px;background:${t < progress ? colorOn : colorOff}"></i>`;
+  }
+  return `<div class="wave">${out}</div>`;
+}
+const NO_SIGNAL = ['Intro','Dust','Something New','Untitled','After Dark','Midnight','Low Ceiling','Hold','Static','No Signal'];
+const DURS = ['1:34','3:58','4:21','2:49','5:07','3:42','4:03','2:18','1:51','6:12'];
+const LIB = ['NO SIGNAL','BLUE ROOM','Midnight','TEST PRESSING','ROOM TONE','LATE'];
+
+function screen(id, caption, cls, inner) {
+  document.body.insertAdjacentHTML('beforeend',
+    `<div><div class="caption">${caption}</div><div class="screen ${cls}" id="${id}">${inner}</div></div>`);
+}
+const sidebar = (active) => `
+<div class="sidebar">
+  <div class="section">Library</div>
+  ${[['Recently Played','◷'],['Albums','▤'],['EPs','▢'],['Singles','◯'],['All Projects','▦'],['Inbox','▽']]
+    .map(([t,g]) => `<div class="item ${t===active?'on':''}"><span class="glyph">${g}</span>${t}</div>`).join('')}
+  <div class="section" style="margin-top:12px">Releases</div>
+  ${LIB.slice(0,4).map(t => `<div class="item"><span style="width:20px;height:20px;border-radius:3px;flex:none;
+      background:linear-gradient(135deg,${shades(t)[0]},${shades(t)[1]})"></span>${t}</div>`).join('')}
+  <div style="flex:1"></div>
+  <div class="item" style="color:var(--tertiary)"><span class="glyph">+</span>New Release</div>
+</div>`;
+const mini = (t, a) => `
+<div class="mini">
+  <span style="width:30px;height:30px;border-radius:4px;flex:none;background:linear-gradient(135deg,${shades('NO SIGNAL')[0]},${shades('NO SIGNAL')[1]})"></span>
+  <div style="min-width:0"><div style="font-size:13px;font-weight:500">${t}</div>
+  <div class="meta">${a}</div></div>
+  <div style="flex:1"></div>
+  <div class="meta">1:12 / 3:42</div>
+  <div class="transport"><span>◀◀</span><span class="playbtn">❚❚</span><span>▶▶</span></div>
+</div>`;
+
+/* 1. Mac library */
+screen('mac-library', 'Mac · Library', 'mac', `
+${sidebar('Albums')}
+<div class="detail">
+  <div class="toolbar"><span class="meta">Syncing</span><span class="meta">◻ Phone Preview</span></div>
+  <div style="padding:32px;overflow:hidden;flex:1">
+    <div class="display-30">Albums</div>
+    <div class="meta" style="margin-top:4px;margin-bottom:24px">6 releases</div>
+    <div class="grid">
+      ${LIB.map((t,i) => `<div class="card">${art(t,'100%',6)}
+        <div class="t">${t}</div><div class="a">Nick Loder</div>
+        <div class="m">${['Album · 10 tracks','EP · 4 tracks','Single · 1 track','Album · 8 tracks','Project · 3 tracks','EP · 5 tracks'][i]}</div></div>`).join('')}
+    </div>
+  </div>
+  ${mini('Midnight','Nick Loder')}
+</div>`);
+
+/* 2. Mac release */
+screen('mac-release', 'Mac · Release', 'mac', `
+${sidebar('Albums')}
+<div class="detail">
+  <div class="toolbar"><span class="meta"></span><span class="meta">◻ Phone Preview</span></div>
+  <div style="display:flex;flex:1;min-height:0">
+    <div style="flex:1;display:flex;flex-direction:column;min-width:0">
+      <div style="padding:32px;display:flex;gap:24px;align-items:flex-end">
+        ${art('NO SIGNAL', 220, 10)}
+        <div style="display:flex;flex-direction:column;gap:12px;padding-bottom:4px">
+          <div class="label">Album</div>
+          <div class="display-44">NO SIGNAL</div>
+          <div style="font-size:18px;font-weight:500;color:var(--secondary)">Nick Loder</div>
+          <div class="meta">Album · 10 tracks · 2026 · 35 minutes</div>
+          <div style="display:flex;gap:12px;margin-top:4px">
+            <span class="filled">▶ Play</span><span class="quiet">⤨ Shuffle</span>
+          </div>
+        </div>
+      </div>
+      <div style="padding:0 24px;overflow:hidden">
+        ${NO_SIGNAL.map((t,i) => `<div class="track ${i===5?'sel':''}">
+          <span class="num">${i===5?'<span class="bars"><i style="height:4px"></i><i style="height:10px"></i><i style="height:6px"></i></span>':(i+1)}</span>
+          <span class="name" style="${i===5?'color:var(--primary)':''}">${t}</span>
+          ${i===5?'<span class="pill">v5 · 4</span>':''}
+          <span class="dur">${DURS[i]}</span></div>`).join('')}
+      </div>
+    </div>
+    <div class="inspector">
+      <div class="field"><span class="label">Title</span><div class="box">Midnight</div></div>
+      <div class="field"><span class="label">Artist</span><div class="box">Nick Loder</div></div>
+      <div class="field"><span class="label">Featured</span><div class="box" style="color:var(--tertiary)">Nobody</div></div>
+      <div style="display:flex;gap:16px">
+        <div class="field"><span class="label">Track</span><div class="box" style="width:48px">6</div></div>
+        <div class="field"><span class="label">Disc</span><div class="box" style="width:48px">1</div></div>
+      </div>
+      <div class="rule"></div>
+      <div><div class="label" style="margin-bottom:8px">Current Version</div>
+        <div class="row-title">v5 — 06 Midnight mix 5.wav</div>
+        <div class="meta" style="margin-top:2px">4 versions</div></div>
+      <div class="rule"></div>
+      <div><div class="label" style="margin-bottom:8px">File</div>
+        <div class="meta" style="color:var(--secondary)">06 Midnight mix 5.wav</div>
+        <div class="meta" style="margin-top:4px">24-bit / 48 kHz &nbsp; 3:42 &nbsp; -10.8 LUFS</div>
+        <div class="meta" style="margin-top:2px">63.9 MB</div></div>
+    </div>
+  </div>
+  ${mini('Midnight','Nick Loder')}
+</div>`);
+
+/* 3. Mac versions */
+screen('mac-versions', 'Mac · Versions', 'mac', `
+${sidebar('Albums')}
+<div class="detail" style="position:relative">
+  <div class="toolbar"></div>
+  <div style="padding:32px;opacity:0.25;pointer-events:none">
+    <div class="display-44">NO SIGNAL</div>
+  </div>
+  <div style="position:absolute;inset:0;background:rgba(0,0,0,0.45)"></div>
+  <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:620px;background:var(--raised);
+              border-radius:14px;padding:32px;display:flex;flex-direction:column;gap:24px;
+              box-shadow:0 24px 60px rgba(0,0,0,0.5)">
+    <div style="display:flex;align-items:flex-start">
+      <div><div class="label">Versions</div><div class="display-22" style="margin-top:2px">Midnight</div></div>
+      <div style="flex:1"></div><span class="quiet">Done</span>
+    </div>
+    <div>
+      <div class="label" style="margin-bottom:8px">Current</div>
+      <div style="display:flex;align-items:center;gap:12px;background:var(--sunken);border-radius:8px;padding:8px 12px">
+        <span style="width:22px;text-align:center">▶</span>
+        <div><div><span class="meta" style="margin-right:8px">v5</span><span class="row-title">Mix 5</span></div>
+          <div class="meta" style="margin-top:1px">3:42 · 24-bit / 48 kHz · -10.8 LUFS</div></div>
+        <div style="flex:1"></div><span style="color:var(--secondary)">⋯</span>
+      </div>
+    </div>
+    <div>
+      <div class="label" style="margin-bottom:8px">Previous</div>
+      ${[['v4','Mix 4','3:41 · 24-bit / 48 kHz'],['v3','Mix 3','3:44 · 24-bit / 48 kHz'],['v2','Rough','3:52 · 24-bit / 44.1 kHz']]
+        .map(([n,l,d]) => `<div style="display:flex;align-items:center;gap:12px;padding:8px 12px">
+          <span style="width:22px;text-align:center;color:var(--secondary)">▶</span>
+          <div><div><span class="meta" style="margin-right:8px">${n}</span><span class="row-title">${l}</span></div>
+            <div class="meta" style="margin-top:1px">${d}</div></div>
+          <div style="flex:1"></div><span class="quiet" style="height:26px;font-size:12px">Make Current</span>
+          <span style="color:var(--secondary)">⋯</span></div>`).join('<div class="rule"></div>')}
+    </div>
+  </div>
+  ${mini('Midnight','Nick Loder')}
+</div>`);
+
+/* 4. Mac phone preview */
+screen('mac-preview', 'Mac · Phone preview', 'mac', `
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px">
+  <div class="modepicker"><span class="on">Stream</span><span>Gallery</span><span>Motion</span></div>
+  <div style="width:393px;height:600px;border-radius:44px;border:1px solid rgba(255,255,255,0.12);
+              background:var(--player-ground);box-shadow:0 20px 40px rgba(0,0,0,0.5);overflow:hidden;
+              display:flex;flex-direction:column;align-items:center;gap:18px;padding:28px 24px">
+    ${art('NO SIGNAL', 300, 10)}
+    <div style="text-align:center"><div class="np-title">Midnight</div>
+      <div class="np-artist" style="margin-top:4px">Nick Loder</div></div>
+    <div style="width:100%">${waveform(110, 0.34, 'var(--player-primary)', 'rgba(245,243,241,0.22)')}
+      <div class="times"><span style="color:var(--player-secondary)">1:12</span>
+        <span style="color:var(--player-secondary)">-2:30</span></div></div>
+    <div class="transport" style="gap:24px;color:var(--player-primary)"><span style="opacity:0.42">⤨</span><span>◀◀</span>
+      <span class="playbtn" style="width:52px;height:52px;font-size:18px">❚❚</span><span>▶▶</span><span style="opacity:0.42">⟳</span></div>
+  </div>
+  <div class="meta">Dense and dark. How most people will glance at it.</div>
+</div>`);
+
+/* 5. Phone home */
+screen('phone-home', 'iPhone · Home', 'phone', `
+<div style="padding:16px 16px 0;height:100%;display:flex;flex-direction:column">
+  <div style="height:44px"></div>
+  <div class="display-30" style="margin-bottom:16px">Dubplate</div>
+  ${art('NO SIGNAL', 361, 10)}
+  <div style="display:flex;align-items:flex-end;margin-top:16px">
+    <div><div class="display-26">NO SIGNAL</div>
+      <div style="font-size:15px;color:var(--secondary);margin-top:2px">Nick Loder</div>
+      <div class="meta" style="margin-top:2px">Album · 10 tracks</div></div>
+    <div style="flex:1"></div>
+    <div class="playbtn" style="width:52px;height:52px;font-size:17px">▶</div>
+  </div>
+  <div class="label" style="margin-top:32px;margin-bottom:12px">Your Music</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+    ${LIB.slice(1,3).map(t => `<div class="card">${art(t,'100%',6)}
+      <div class="t">${t}</div><div class="a">Nick Loder</div></div>`).join('')}
+  </div>
+</div>
+<div style="position:absolute;left:12px;right:12px;bottom:8px;height:62px;border-radius:12px;
+            background:rgba(11,11,12,0.94);display:flex;align-items:center;gap:12px;padding:0 12px;
+            border:1px solid var(--hairline)">
+  <span style="width:40px;height:40px;border-radius:4px;background:linear-gradient(135deg,${shades('NO SIGNAL')[0]},${shades('NO SIGNAL')[1]})"></span>
+  <div><div style="font-size:13px;font-weight:500">Midnight</div><div class="meta">Nick Loder</div></div>
+  <div style="flex:1"></div>
+  <div class="transport" style="gap:12px"><span>◀◀</span><span class="playbtn">❚❚</span><span>▶▶</span></div>
+  <div style="position:absolute;left:0;bottom:0;height:2px;width:34%;background:rgba(245,243,241,0.55)"></div>
+</div>`);
+
+/* 6. Phone release */
+screen('phone-release', 'iPhone · Release', 'phone', `
+<div style="padding:0 16px;height:100%;overflow:hidden;display:flex;flex-direction:column">
+  <div style="height:52px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600">NO SIGNAL</div>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:16px;margin-top:8px">
+    ${art('NO SIGNAL', 260, 10)}
+    <div style="text-align:center">
+      <div class="label">Album</div>
+      <div class="display-30" style="margin-top:4px">NO SIGNAL</div>
+      <div style="font-size:16px;font-weight:500;color:var(--secondary);margin-top:4px">Nick Loder</div>
+      <div class="meta" style="margin-top:4px">Album · 10 tracks · 2026 · 35 minutes</div>
+    </div>
+    <div style="display:flex;gap:12px"><span class="filled">▶ Play</span><span class="quiet">⤨ Shuffle</span></div>
+  </div>
+  <div style="margin-top:24px">
+    ${NO_SIGNAL.slice(0,6).map((t,i) => `<div style="display:flex;align-items:center;gap:12px;height:56px;border-bottom:1px solid var(--hairline)">
+      <span class="num" style="width:26px">${i===5?'<span class="bars"><i style="height:4px"></i><i style="height:10px"></i><i style="height:6px"></i></span>':(i+1)}</span>
+      <span class="name" style="flex:1;font-size:14px;${i===5?'color:var(--primary)':''}">${t}</span>
+      ${i===5?'<span class="pill">v5 · 4</span><span style="color:var(--tertiary);padding:0 8px">⋯</span>':''}
+      <span class="dur">${DURS[i]}</span></div>`).join('')}
+  </div>
+</div>`);
+
+/* 7. Phone now playing — Stream */
+screen('phone-stream', 'iPhone · Now Playing (Stream)', 'phone', `
+<div style="height:100%;display:flex;flex-direction:column;align-items:center;padding:24px;gap:24px">
+  <div style="align-self:flex-start;color:var(--player-secondary);font-size:14px;padding:8px">⌄</div>
+  ${art('NO SIGNAL', 345, 10)}
+  <div style="text-align:center"><div class="np-title">Midnight</div>
+    <div class="np-artist" style="margin-top:4px">Nick Loder</div></div>
+  <div style="width:100%">${waveform(126, 0.34, 'var(--player-primary)', 'rgba(245,243,241,0.22)')}
+    <div class="times"><span style="color:var(--player-secondary)">1:12</span>
+      <span style="color:var(--player-secondary)">-2:30</span></div></div>
+  <div class="transport" style="gap:24px;color:var(--player-primary)"><span style="opacity:0.42">⤨</span><span>◀◀</span>
+    <span class="playbtn" style="width:52px;height:52px;font-size:18px">❚❚</span><span>▶▶</span><span style="opacity:0.42">⟳</span></div>
+  <div style="display:flex;gap:32px;color:var(--player-secondary);font-size:10px;text-align:center">
+    <div><div style="font-size:15px">▤</div>Versions</div><div><div style="font-size:15px">☰</div>Up Next</div></div>
+  <div style="flex:1"></div>
+  <div class="modepicker"><span class="on">Stream</span><span>Gallery</span><span>Motion</span></div>
+</div>`);
+
+/* 8. Phone now playing — Motion */
+screen('phone-motion', 'iPhone · Now Playing (Motion)', 'phone', `
+<div style="position:absolute;inset:0;background:linear-gradient(135deg,${shades('NO SIGNAL')[0]},${shades('NO SIGNAL')[1]});
+            transform:scale(1.25)"></div>
+<div style="position:absolute;inset:0;background:linear-gradient(to bottom, rgba(0,0,0,0.05), rgba(0,0,0,0.35) 45%, rgba(0,0,0,0.85))"></div>
+<div style="position:absolute;inset:0;padding:24px 24px 72px;display:flex;flex-direction:column;justify-content:flex-end;gap:16px">
+  <div>
+    <div class="label" style="color:rgba(255,255,255,0.7)">NO SIGNAL</div>
+    <div style="font-size:30px;font-weight:600;letter-spacing:-0.7px;color:#fff;margin-top:4px">Midnight</div>
+    <div style="font-size:15px;color:rgba(255,255,255,0.75);margin-top:2px">Nick Loder</div>
+  </div>
+  ${waveform(126, 0.34, '#fff', 'rgba(255,255,255,0.22)')}
+  <div class="times"><span style="color:rgba(255,255,255,0.55)">1:12</span><span style="color:rgba(255,255,255,0.55)">-2:30</span></div>
+  <div style="display:flex;align-items:center">
+    <div class="transport" style="gap:12px;color:#fff"><span>◀◀</span>
+      <span class="playbtn" style="background:#fff;color:#111">❚❚</span><span>▶▶</span></div>
+    <div style="flex:1"></div>
+    <span style="font-size:12px;font-weight:500;color:rgba(255,255,255,0.75)">Versions</span>
+  </div>
+</div>
+<div style="position:absolute;left:50%;transform:translateX(-50%);bottom:16px"><div class="modepicker">
+  <span>Stream</span><span>Gallery</span><span class="on">Motion</span></div></div>`);
+</script>
