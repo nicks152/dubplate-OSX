@@ -22,7 +22,7 @@ public struct QueueView: View {
                 if let onDismiss {
                     Button("Done", action: onDismiss)
                         .buttonStyle(.plain)
-                        .font(.system(size: 13, weight: .medium))
+                        .dubplateFont(.fixed(13, weight: .medium))
                         .foregroundStyle(DubplateColor.playerSecondaryText)
                 }
             }
@@ -34,7 +34,7 @@ public struct QueueView: View {
 
             if player.queue.upNext.isEmpty {
                 Text("Nothing after this one.")
-                    .font(DubplateType.rowSubtitle)
+                    .dubplateFont(DubplateType.rowSubtitle)
                     .foregroundStyle(DubplateColor.playerSecondaryText)
                     .padding(.vertical, DubplateLayout.l)
             } else {
@@ -62,23 +62,23 @@ public struct QueueView: View {
                         .frame(width: 18)
                 } else {
                     Text("\(item.trackNumber)")
-                        .font(DubplateType.metadata)
+                        .dubplateFont(DubplateType.metadata)
                         .foregroundStyle(DubplateColor.playerSecondaryText)
                         .frame(width: 18, alignment: .trailing)
                 }
                 VStack(alignment: .leading, spacing: 1) {
                     Text(item.title)
-                        .font(DubplateType.rowTitle)
+                        .dubplateFont(DubplateType.rowTitle)
                         .foregroundStyle(DubplateColor.playerPrimaryText)
                         .lineLimit(1)
                     Text(item.artistName)
-                        .font(DubplateType.metadata)
+                        .dubplateFont(DubplateType.metadata)
                         .foregroundStyle(DubplateColor.playerSecondaryText)
                         .lineLimit(1)
                 }
                 Spacer()
                 Text(Formatting.duration(item.duration))
-                    .font(DubplateType.metadata)
+                    .dubplateFont(DubplateType.metadata)
                     .foregroundStyle(DubplateColor.playerSecondaryText)
             }
             .padding(.vertical, DubplateLayout.s)
@@ -120,13 +120,13 @@ public struct VersionPickerSheet: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Mixes").dubplateLabelStyle(DubplateColor.playerSecondaryText)
                     Text(track.displayTitle)
-                        .font(.system(size: 20, weight: .semibold))
+                        .dubplateFont(.fixed(20, weight: .semibold))
                         .foregroundStyle(DubplateColor.playerPrimaryText)
                 }
                 Spacer()
                 Button("Done", action: onDismiss)
                     .buttonStyle(.plain)
-                    .font(.system(size: 13, weight: .medium))
+                    .dubplateFont(.fixed(13, weight: .medium))
                     .foregroundStyle(DubplateColor.playerSecondaryText)
             }
 
@@ -140,16 +140,16 @@ public struct VersionPickerSheet: View {
                     } label: {
                         HStack(spacing: DubplateLayout.m) {
                             Image(systemName: "checkmark")
-                                .font(.system(size: 12, weight: .semibold))
+                                .dubplateFont(.fixed(12, weight: .semibold))
                                 .foregroundStyle(DubplateColor.playerPrimaryText)
                                 .opacity(playingVersionID == version.id ? 1 : 0)
                                 .frame(width: 16)
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(version.listeningLabel)
-                                    .font(DubplateType.rowTitle)
+                                    .dubplateFont(DubplateType.rowTitle)
                                     .foregroundStyle(DubplateColor.playerPrimaryText)
                                 Text(subtitle(for: version))
-                                    .font(DubplateType.metadata)
+                                    .dubplateFont(DubplateType.metadata)
                                     .foregroundStyle(DubplateColor.playerSecondaryText)
                             }
                             Spacer(minLength: 0)
@@ -162,13 +162,13 @@ public struct VersionPickerSheet: View {
 
                     if version.isCurrent {
                         Text("In the record")
-                            .font(DubplateType.label)
+                            .dubplateFont(DubplateType.label)
                             .kerning(0.5)
                             .foregroundStyle(DubplateColor.playerSecondaryText)
                     } else {
                         Button("Use This Mix") { onSetCurrent(version) }
                             .buttonStyle(.plain)
-                            .font(.system(size: 11, weight: .medium))
+                            .dubplateFont(.fixed(11, weight: .medium))
                             .foregroundStyle(DubplateColor.playerSecondaryText)
                             .frame(minHeight: DubplateLayout.minimumTapTarget)
                     }

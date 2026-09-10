@@ -92,7 +92,7 @@ public struct NewReleaseSheet: View {
                     typeWasChosen = true
                 } label: {
                     Text(option.displayName)
-                        .font(.system(size: 12, weight: .medium))
+                        .dubplateFont(.fixed(12, weight: .medium))
                         .padding(.horizontal, DubplateLayout.l)
                         .frame(height: 30)
                         .background(
@@ -110,12 +110,12 @@ public struct NewReleaseSheet: View {
         VStack(alignment: .leading, spacing: DubplateLayout.m) {
             TextField("Release title", text: $title)
                 .textFieldStyle(.plain)
-                .font(.system(size: 22, weight: .medium))
+                .dubplateFont(.fixed(22, weight: .medium))
                 .focused($titleFocused)
             Divider().overlay(DubplateColor.hairline)
             TextField("Artist", text: $artistName)
                 .textFieldStyle(.plain)
-                .font(.system(size: 15))
+                .dubplateFont(.fixed(15))
                 .foregroundStyle(DubplateColor.secondaryText)
             Divider().overlay(DubplateColor.hairline)
         }
@@ -123,14 +123,17 @@ public struct NewReleaseSheet: View {
 
     private var artworkWell: some View {
         DropWell(
-            title: artworkURL == nil ? "Drop artwork" : (artworkURL?.lastPathComponent ?? ""),
-            detail: "JPEG, PNG or HEIC",
+            title: artworkURL == nil ? "Drop artwork" : "Cover",
+            detail: artworkURL?.lastPathComponent ?? "JPEG, PNG or HEIC",
             isTargeted: isTargetedForArtwork,
             height: 132
         ) {
             if let artworkURL {
-                ArtworkView(asset: nil, title: artworkURL.deletingPathExtension().lastPathComponent)
-                    .frame(width: 96, height: 96)
+                FileArtworkPreview(
+                    url: artworkURL,
+                    fallbackTitle: artworkURL.deletingPathExtension().lastPathComponent
+                )
+                .frame(width: 96, height: 96)
             }
         }
         .dropDestination(for: URL.self) { urls, _ in
@@ -203,12 +206,12 @@ public struct DropWell<Content: View>: View {
         VStack(spacing: DubplateLayout.s) {
             content
             Text(title)
-                .font(.system(size: 13, weight: .medium))
+                .dubplateFont(.fixed(13, weight: .medium))
                 .foregroundStyle(DubplateColor.primaryText)
                 .lineLimit(1)
                 .truncationMode(.middle)
             Text(detail)
-                .font(DubplateType.metadata)
+                .dubplateFont(DubplateType.metadata)
                 .foregroundStyle(DubplateColor.tertiaryText)
                 .multilineTextAlignment(.center)
         }

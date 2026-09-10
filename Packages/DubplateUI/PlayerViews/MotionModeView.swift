@@ -50,12 +50,12 @@ public struct MotionModeView: View {
                     Text(player.currentItem?.releaseTitle ?? "")
                         .dubplateLabelStyle(.white.opacity(0.7))
                     Text(player.currentItem?.title ?? "")
-                        .font(.system(size: 30, weight: .semibold))
+                        .dubplateFont(.fixed(30, weight: .semibold))
                         .kerning(-0.7)
                         .foregroundStyle(.white)
                         .lineLimit(2)
                     Text(player.currentItem?.artistName ?? "")
-                        .font(.system(size: 15))
+                        .dubplateFont(.fixed(15))
                         .foregroundStyle(.white.opacity(0.75))
                 }
 
@@ -77,7 +77,7 @@ public struct MotionModeView: View {
                             if let onShowVersions {
                                 Button("Mixes", action: onShowVersions)
                                     .buttonStyle(.plain)
-                                    .font(.system(size: 12, weight: .medium))
+                                    .dubplateFont(.fixed(12, weight: .medium))
                                     .foregroundStyle(.white.opacity(0.75))
                             }
                         }

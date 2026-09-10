@@ -32,12 +32,12 @@ public struct TrackDropSheet: View {
         VStack(alignment: .leading, spacing: DubplateLayout.xl) {
             VStack(alignment: .leading, spacing: DubplateLayout.xs) {
                 Text(filename)
-                    .font(.system(size: 17, weight: .medium))
+                    .dubplateFont(.fixed(17, weight: .medium))
                     .foregroundStyle(DubplateColor.primaryText)
                     .lineLimit(2)
                     .truncationMode(.middle)
                 Text(subtitle)
-                    .font(DubplateType.metadata)
+                    .dubplateFont(DubplateType.metadata)
                     .foregroundStyle(DubplateColor.tertiaryText)
             }
 
@@ -49,13 +49,13 @@ public struct TrackDropSheet: View {
                         HStack(alignment: .top, spacing: DubplateLayout.m) {
                             Image(systemName: choice == option ? "largecircle.fill.circle" : "circle")
                                 .foregroundStyle(choice == option ? DubplateColor.accent : DubplateColor.tertiaryText)
-                                .font(.system(size: 15))
+                                .dubplateFont(.fixed(15))
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(option.title)
-                                    .font(DubplateType.rowTitle)
+                                    .dubplateFont(DubplateType.rowTitle)
                                     .foregroundStyle(DubplateColor.primaryText)
                                 Text(option.explanation)
-                                    .font(DubplateType.metadata)
+                                    .dubplateFont(DubplateType.metadata)
                                     .foregroundStyle(DubplateColor.tertiaryText)
                             }
                             Spacer()
@@ -77,7 +77,9 @@ public struct TrackDropSheet: View {
                 Button("Cancel", action: onCancel)
                     .buttonStyle(DubplateQuietButtonStyle())
                     .keyboardShortcut(.cancelAction)
-                Button("Continue") { onChoose(choice) }
+                // Named after what it does, because one of these three deletes a
+                // file. "Continue" is the wrong word for that in any dialog.
+                Button(choice.title) { onChoose(choice) }
                     .buttonStyle(DubplateFilledButtonStyle())
                     .keyboardShortcut(.defaultAction)
             }

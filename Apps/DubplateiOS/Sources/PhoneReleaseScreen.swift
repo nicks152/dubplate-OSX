@@ -85,12 +85,12 @@ struct PhoneReleaseScreen: View {
                             versionsTrack = track
                         } label: {
                             Image(systemName: "ellipsis")
-                                .font(.system(size: 14, weight: .semibold))
+                                .dubplateFont(.fixed(14, weight: .semibold))
                                 .foregroundStyle(DubplateColor.tertiaryText)
                                 .frame(width: DubplateLayout.minimumTapTarget, height: DubplateLayout.minimumTapTarget)
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Versions of \(track.displayTitle)")
+                        .accessibilityLabel("Mixes of \(track.displayTitle)")
                     }
                 }
                 Divider().overlay(DubplateColor.hairline).padding(.leading, 38)
@@ -102,11 +102,11 @@ struct PhoneReleaseScreen: View {
         VStack(alignment: .leading, spacing: DubplateLayout.s) {
             if let copyright = release.copyrightText, !copyright.isEmpty {
                 Text(copyright)
-                    .font(DubplateType.metadata)
+                    .dubplateFont(DubplateType.metadata)
                     .foregroundStyle(DubplateColor.tertiaryText)
             }
             Text(footerLine)
-                .font(DubplateType.metadata)
+                .dubplateFont(DubplateType.metadata)
                 .foregroundStyle(DubplateColor.tertiaryText)
 
             DownloadButton(release: release)
@@ -140,7 +140,7 @@ struct DownloadButton: View {
                 // A condition, not an action. A disabled button whose label is a
                 // status is a control that lies about being one.
                 Text(state.title)
-                    .font(.system(size: 13, weight: .medium))
+                    .dubplateFont(.fixed(13, weight: .medium))
                     .foregroundStyle(DubplateColor.secondaryText)
             } else {
                 Button {
@@ -153,7 +153,7 @@ struct DownloadButton: View {
             }
 
             Text(state.detail(size: totalSize))
-                .font(DubplateType.metadata)
+                .dubplateFont(DubplateType.metadata)
                 .foregroundStyle(DubplateColor.tertiaryText)
         }
     }

@@ -69,13 +69,26 @@ public final class AudioSessionCoordinator {
         let center = NotificationCenter.default
         let session = AVAudioSession.sharedInstance()
 
+        // The notification is read here, where it arrives, and only plain values
+        // cross to the main actor. A `Task { @MainActor }` hop rather than
+        // `assumeIsolated`: the queue is main today, but asserting isolation from a
+        // queue is an assumption, and under strict concurrency a wrong one traps
+        // rather than warns.
         center.addObserver(
             forName: AVAudioSession.interruptionNotification,
             object: session,
             queue: .main
         ) { [weak self] notification in
-            MainActor.assumeIsolated {
-                self?.handleInterruption(notification)
+            let info = notification.userInfo
+            let type = (info?[AVAudioSessionInterruptionTypeKey] as? UInt)
+                .flatMap(AVAudioSession.InterruptionType.init(rawValue:))
+            let options = AVAudioSession.InterruptionOptions(
+                rawValue: info?[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
+            )
+            guard let type else { return }
+            let shouldResume = options.contains(.shouldResume)
+            Task { @MainActor [weak self] in
+                self?.handleInterruption(type, shouldResume: shouldResume)
             }
         }
 
@@ -84,34 +97,30 @@ public final class AudioSessionCoordinator {
             object: session,
             queue: .main
         ) { [weak self] notification in
-            MainActor.assumeIsolated {
-                self?.handleRouteChange(notification)
+            let reason = (notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt)
+                .flatMap(AVAudioSession.RouteChangeReason.init(rawValue:))
+            guard let reason else { return }
+            Task { @MainActor [weak self] in
+                self?.handleRouteChange(reason)
             }
         }
     }
 
-    private func handleInterruption(_ notification: Notification) {
-        guard let value = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
-              let type = AVAudioSession.InterruptionType(rawValue: value)
-        else { return }
-
+    private func handleInterruption(
+        _ type: AVAudioSession.InterruptionType,
+        shouldResume: Bool
+    ) {
         switch type {
         case .began:
             onInterruption?(.began)
         case .ended:
-            let raw = notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
-            let options = AVAudioSession.InterruptionOptions(rawValue: raw)
-            onInterruption?(.ended(shouldResume: options.contains(.shouldResume)))
+            onInterruption?(.ended(shouldResume: shouldResume))
         @unknown default:
             break
         }
     }
 
-    private func handleRouteChange(_ notification: Notification) {
-        guard let value = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
-              let reason = AVAudioSession.RouteChangeReason(rawValue: value)
-        else { return }
-
+    private func handleRouteChange(_ reason: AVAudioSession.RouteChangeReason) {
         switch reason {
         case .oldDeviceUnavailable:
             // Headphones out. Never keep playing out of the speaker.

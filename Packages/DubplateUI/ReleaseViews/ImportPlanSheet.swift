@@ -43,7 +43,7 @@ public struct ImportPlanSheet: View {
                     .dubplateDisplayStyle(.sheet)
                     .foregroundStyle(DubplateColor.primaryText)
                 Text(plan.summary)
-                    .font(DubplateType.metadata)
+                    .dubplateFont(DubplateType.metadata)
                     .foregroundStyle(DubplateColor.tertiaryText)
             }
 
@@ -53,7 +53,7 @@ public struct ImportPlanSheet: View {
                     + "Dubplate is adding the first \(DroppedFiles.perDropLimit); "
                     + "drop the rest in afterwards."
                 )
-                .font(DubplateType.metadata)
+                .dubplateFont(DubplateType.metadata)
                 .foregroundStyle(DubplateColor.primaryText)
                 .padding(DubplateLayout.m)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -84,16 +84,16 @@ public struct ImportPlanSheet: View {
                             ForEach(visibleNewTracks) { planned in
                                 HStack(spacing: DubplateLayout.m) {
                                     Text("\(planned.trackNumber)")
-                                        .font(DubplateType.metadata)
+                                        .dubplateFont(DubplateType.metadata)
                                         .foregroundStyle(DubplateColor.tertiaryText)
                                         .frame(width: 22, alignment: .trailing)
                                     Text(planned.title)
-                                        .font(DubplateType.rowTitle)
+                                        .dubplateFont(DubplateType.rowTitle)
                                         .foregroundStyle(DubplateColor.primaryText)
                                     Spacer()
                                     if planned.candidates.count > 1 {
-                                        Text("\(planned.candidates.count) versions")
-                                            .font(DubplateType.metadata)
+                                        Text("\(planned.candidates.count) mixes")
+                                            .dubplateFont(DubplateType.metadata)
                                             .foregroundStyle(DubplateColor.tertiaryText)
                                     }
                                 }
@@ -105,7 +105,7 @@ public struct ImportPlanSheet: View {
                             SectionHeader("Not added")
                             ForEach(plan.rejected) { rejected in
                                 Text("\(rejected.filename) — \(rejected.reason)")
-                                    .font(DubplateType.metadata)
+                                    .dubplateFont(DubplateType.metadata)
                                     .foregroundStyle(DubplateColor.tertiaryText)
                                     .lineLimit(1)
                                     .truncationMode(.middle)
@@ -118,7 +118,7 @@ public struct ImportPlanSheet: View {
 
             HStack {
                 Text(orderingNote)
-                    .font(DubplateType.metadata)
+                    .dubplateFont(DubplateType.metadata)
                     .foregroundStyle(DubplateColor.tertiaryText)
                 Spacer()
                 Button("Cancel", action: onCancel)
@@ -139,18 +139,18 @@ public struct ImportPlanSheet: View {
         return HStack(alignment: .top, spacing: DubplateLayout.m) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(planned.candidate.filename)
-                    .font(DubplateType.rowTitle)
+                    .dubplateFont(DubplateType.rowTitle)
                     .foregroundStyle(DubplateColor.primaryText)
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Text(isDemoted
                      ? "Will be added as a new track"
-                     : "New version of \(planned.match.trackTitle) — \(planned.match.reason.lowercased())")
-                    .font(DubplateType.metadata)
+                     : "New mix of \(planned.match.trackTitle) — \(planned.match.reason.lowercased())")
+                    .dubplateFont(DubplateType.metadata)
                     .foregroundStyle(DubplateColor.tertiaryText)
             }
             Spacer(minLength: DubplateLayout.s)
-            Button(isDemoted ? "Make Version" : "New Track Instead") {
+            Button(isDemoted ? "Make It a Mix" : "New Track Instead") {
                 if isDemoted {
                     demoted.remove(planned.id)
                 } else {
@@ -169,14 +169,14 @@ public struct ImportPlanSheet: View {
         return HStack(alignment: .top, spacing: DubplateLayout.m) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(planned.candidate.filename)
-                    .font(DubplateType.rowTitle)
+                    .dubplateFont(DubplateType.rowTitle)
                     .foregroundStyle(DubplateColor.primaryText)
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Text(isPromoted
                      ? "Will be a new mix of \(planned.match.trackTitle)"
                      : "Might be \(planned.match.trackTitle) — \(planned.match.reason.lowercased()). Adding as a new track.")
-                    .font(DubplateType.metadata)
+                    .dubplateFont(DubplateType.metadata)
                     .foregroundStyle(DubplateColor.tertiaryText)
             }
             Spacer(minLength: DubplateLayout.s)

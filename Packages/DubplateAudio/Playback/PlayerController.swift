@@ -330,9 +330,12 @@ public final class PlayerController {
         session.activate()
         let url = mediaStore.url(forRelativePath: item.relativePath)
         do {
-            // Opening parses headers and pages in from disk. On a file that a
-            // download has just put in place that is a visible hitch at a track
-            // boundary, so it happens off the main actor.
+            // On the main actor, deliberately. Opening reads the header — a few
+            // hundred bytes of a local file — and pressing play has to start audio
+            // in this turn of the run loop, not after a hop. If profiling on a
+            // device ever shows this costing a frame, the fix is not a detached
+            // task: `AVAudioFile` is not Sendable and the engine holds it, so it
+            // would have to be opened and kept on whichever actor renders it.
             let file = try engine.openFile(at: url)
             try engine.start(item: item.id, file: file, at: offset)
             isPlaying = true

@@ -72,7 +72,7 @@ public struct GalleryModeView: View {
                     .foregroundStyle(DubplateColor.playerPrimaryText)
 
                 Text(player.currentItem?.artistName ?? "")
-                    .font(.system(size: 15))
+                    .dubplateFont(.fixed(15))
                     .foregroundStyle(DubplateColor.playerSecondaryText)
             }
 
@@ -94,7 +94,7 @@ public struct GalleryModeView: View {
                 if let onShowVersions {
                     Button("Mixes", action: onShowVersions)
                         .buttonStyle(.plain)
-                        .font(.system(size: 12, weight: .medium))
+                        .dubplateFont(.fixed(12, weight: .medium))
                         .foregroundStyle(DubplateColor.playerSecondaryText)
                 }
             }
@@ -114,18 +114,18 @@ public struct GalleryModeView: View {
                 } label: {
                     HStack(spacing: DubplateLayout.m) {
                         Text("\(item.trackNumber)")
-                            .font(DubplateType.metadata)
+                            .dubplateFont(DubplateType.metadata)
                             .foregroundStyle(DubplateColor.playerSecondaryText)
                             .frame(width: 18, alignment: .trailing)
                         Text(item.title)
-                            .font(.system(size: 15, weight: isCurrent ? .medium : .regular))
+                            .dubplateFont(.fixed(15, weight: isCurrent ? .medium : .regular))
                             .foregroundStyle(
                                 isCurrent ? DubplateColor.playerPrimaryText : DubplateColor.playerSecondaryText
                             )
                             .lineLimit(1)
                         Spacer(minLength: DubplateLayout.s)
                         Text(Formatting.duration(item.duration))
-                            .font(DubplateType.metadata)
+                            .dubplateFont(DubplateType.metadata)
                             .foregroundStyle(DubplateColor.playerSecondaryText)
                     }
                     .frame(height: 26)
@@ -146,7 +146,7 @@ public struct GalleryModeView: View {
                 Text("\(release) · \(player.currentItem?.artistName ?? "")")
             }
         }
-        .font(DubplateType.metadata)
+        .dubplateFont(DubplateType.metadata)
         .foregroundStyle(DubplateColor.playerSecondaryText)
     }
 }

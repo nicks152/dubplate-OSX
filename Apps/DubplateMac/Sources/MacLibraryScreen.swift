@@ -119,9 +119,9 @@ struct DropOverlay: View {
             DubplateColor.ground.opacity(0.86)
             VStack(spacing: DubplateLayout.s) {
                 Image(systemName: "arrow.down.circle")
-                    .font(.system(size: 28, weight: .light))
+                    .dubplateFont(.fixed(28, weight: .light))
                 Text(message)
-                    .font(.system(size: 15, weight: .medium))
+                    .dubplateFont(.fixed(15, weight: .medium))
             }
             .foregroundStyle(DubplateColor.primaryText)
         }

@@ -40,10 +40,10 @@ struct MacSearchResultsView: View {
                                     .frame(width: 56, alignment: .leading)
                                 VStack(alignment: .leading, spacing: 1) {
                                     Text(result.title)
-                                        .font(DubplateType.rowTitle)
+                                        .dubplateFont(DubplateType.rowTitle)
                                         .foregroundStyle(DubplateColor.primaryText)
                                     Text(result.subtitle)
-                                        .font(DubplateType.metadata)
+                                        .dubplateFont(DubplateType.metadata)
                                         .foregroundStyle(DubplateColor.tertiaryText)
                                 }
                                 Spacer()
@@ -65,7 +65,7 @@ struct MacSearchResultsView: View {
         switch kind {
         case .release: return "Release"
         case .track: return "Track"
-        case .version: return "Version"
+        case .version: return "Mix"
         }
     }
 
@@ -92,7 +92,7 @@ struct InboxScreen: View {
                     .dubplateDisplayStyle(.screen)
                     .foregroundStyle(DubplateColor.primaryText)
                 Text("Ideas and loose bounces that aren’t on a record yet.")
-                    .font(DubplateType.metadata)
+                    .dubplateFont(DubplateType.metadata)
                     .foregroundStyle(DubplateColor.tertiaryText)
             }
             .padding(DubplateLayout.xxl)
@@ -172,7 +172,7 @@ struct MacSettingsView: View {
                 ))
                 if let explanation = sync.accountState.explanation {
                     Text(explanation.title)
-                        .font(DubplateType.metadata)
+                        .dubplateFont(DubplateType.metadata)
                         .foregroundStyle(DubplateColor.secondaryText)
                 }
                 Button("Sync Now") {
@@ -184,7 +184,7 @@ struct MacSettingsView: View {
             Section("Audio") {
                 Toggle("Measure loudness", isOn: $settings.measuresLoudness)
                 Text("Reads each file once to show its LUFS. Dubplate never changes your audio.")
-                    .font(DubplateType.metadata)
+                    .dubplateFont(DubplateType.metadata)
                     .foregroundStyle(DubplateColor.tertiaryText)
             }
 
@@ -210,7 +210,7 @@ struct MacSettingsView: View {
 
             Section("About") {
                 Text(DubplateSettings.audioPolicy)
-                    .font(DubplateType.metadata)
+                    .dubplateFont(DubplateType.metadata)
                     .foregroundStyle(DubplateColor.tertiaryText)
             }
         }

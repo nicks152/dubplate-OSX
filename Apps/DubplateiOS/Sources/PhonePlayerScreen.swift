@@ -45,7 +45,7 @@ struct PhonePlayerScreen: View {
                 .presentationDetents([.medium])
                 .presentationBackground(DubplateColor.playerGround)
             } else {
-                EmptyState(headline: "No versions", message: "This track only has one mix.")
+                EmptyState(headline: "One mix", message: "There is nothing else to compare this to yet.")
             }
         }
     }
@@ -96,9 +96,9 @@ struct PhoneSettingsScreen: View {
                 ))
                 if let explanation = sync.accountState.explanation {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(explanation.title).font(.system(size: 14))
+                        Text(explanation.title).dubplateFont(.fixed(14))
                         Text(explanation.detail)
-                            .font(DubplateType.metadata)
+                            .dubplateFont(DubplateType.metadata)
                             .foregroundStyle(DubplateColor.tertiaryText)
                     }
                 }
@@ -110,7 +110,7 @@ struct PhoneSettingsScreen: View {
             Section("Downloads") {
                 Toggle("Download over cellular", isOn: $settings.allowsCellularDownloads)
                 Text("An album is often more than a gigabyte. With this off, Dubplate waits for Wi-Fi.")
-                    .font(DubplateType.metadata)
+                    .dubplateFont(DubplateType.metadata)
                     .foregroundStyle(DubplateColor.tertiaryText)
             }
 
@@ -134,10 +134,10 @@ struct PhoneSettingsScreen: View {
             Section {
                 LabeledContent("Version", value: appVersion)
                 Text(DubplateSettings.audioPolicy)
-                    .font(DubplateType.metadata)
+                    .dubplateFont(DubplateType.metadata)
                     .foregroundStyle(DubplateColor.tertiaryText)
                 Text("Dubplate keeps your unreleased music private. Nothing leaves your devices except through your own iCloud account.")
-                    .font(DubplateType.metadata)
+                    .dubplateFont(DubplateType.metadata)
                     .foregroundStyle(DubplateColor.tertiaryText)
             } header: {
                 Text("About")

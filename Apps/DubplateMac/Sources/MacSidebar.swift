@@ -45,7 +45,7 @@ struct MacSidebar: View {
                 isShowingNewRelease = true
             } label: {
                 Label("New Release", systemImage: "plus")
-                    .font(.system(size: 12, weight: .medium))
+                    .dubplateFont(.fixed(12, weight: .medium))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, DubplateLayout.m)
                     .frame(height: 34)
@@ -94,7 +94,7 @@ struct MacSidebar: View {
 
     private func row(_ target: LibrarySection) -> some View {
         Text(target.title)
-            .font(.system(size: 13))
+            .dubplateFont(.fixed(13))
             .frame(height: 22)
             .tag(target)
     }
@@ -105,7 +105,7 @@ struct MacSidebar: View {
                 .frame(width: 20, height: 20)
             VStack(alignment: .leading, spacing: 0) {
                 Text(release.title.isEmpty ? "Untitled" : release.title)
-                    .font(.system(size: 13))
+                    .dubplateFont(.fixed(13))
                     .lineLimit(1)
             }
             Spacer(minLength: 0)
@@ -135,7 +135,7 @@ struct SyncStatusLabel: View {
                     ProgressView().controlSize(.mini)
                 }
                 Text(label)
-                    .font(DubplateType.metadata)
+                    .dubplateFont(DubplateType.metadata)
                     .foregroundStyle(DubplateColor.tertiaryText)
                     .lineLimit(1)
             }

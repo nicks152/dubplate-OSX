@@ -47,7 +47,7 @@ public struct ReleaseCard: View {
                 if let onPlay, isHovering || alwaysShowsPlay {
                     Button(action: onPlay) {
                         Image(systemName: "play.fill")
-                            .font(.system(size: 15, weight: .semibold))
+                            .dubplateFont(.fixed(15, weight: .semibold))
                             .foregroundStyle(DubplateColor.playerPrimaryText)
                             .frame(width: 40, height: 40)
                             .background(.black.opacity(0.55), in: Circle())
@@ -69,13 +69,13 @@ public struct ReleaseCard: View {
                         PlayingIndicator(isAnimating: isAnimatingIndicator)
                     }
                     Text(release.title.isEmpty ? "Untitled" : release.title)
-                        .font(DubplateType.cardTitle)
+                        .dubplateFont(DubplateType.cardTitle)
                         .foregroundStyle(DubplateColor.primaryText)
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
                 Text(release.artistName)
-                    .font(DubplateType.rowSubtitle)
+                    .dubplateFont(DubplateType.rowSubtitle)
                     .foregroundStyle(DubplateColor.secondaryText)
                     .lineLimit(1)
             }

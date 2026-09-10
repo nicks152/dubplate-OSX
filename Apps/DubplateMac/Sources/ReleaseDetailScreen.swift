@@ -465,7 +465,7 @@ struct SequenceWarning: View {
 
     var body: some View {
         Text(message)
-            .font(DubplateType.metadata)
+            .dubplateFont(DubplateType.metadata)
             .foregroundStyle(DubplateColor.secondaryText)
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityElement(children: .combine)
@@ -482,12 +482,12 @@ struct ImportProgressBar: View {
                 .progressViewStyle(.linear)
                 .frame(width: 160)
             Text(progress.currentFilename)
-                .font(DubplateType.metadata)
+                .dubplateFont(DubplateType.metadata)
                 .foregroundStyle(DubplateColor.secondaryText)
                 .lineLimit(1)
                 .truncationMode(.middle)
             Text("\(progress.completed) of \(progress.total)")
-                .font(DubplateType.metadata)
+                .dubplateFont(DubplateType.metadata)
                 .foregroundStyle(DubplateColor.tertiaryText)
         }
         .padding(.horizontal, DubplateLayout.l)

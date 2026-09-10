@@ -27,11 +27,11 @@ public struct EmptyState: View {
     public var body: some View {
         VStack(spacing: DubplateLayout.m) {
             Text(headline)
-                .font(.system(size: 20, weight: .semibold))
+                .dubplateFont(.fixed(20, weight: .semibold))
                 .kerning(-0.2)
                 .foregroundStyle(DubplateColor.primaryText)
             Text(message)
-                .font(DubplateType.rowSubtitle)
+                .dubplateFont(DubplateType.rowSubtitle)
                 .foregroundStyle(DubplateColor.secondaryText)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 320)
@@ -56,7 +56,7 @@ public struct DubplateFilledButtonStyle: ButtonStyle {
 
     public func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 13, weight: .medium))
+            .dubplateFont(.fixed(13, weight: .medium))
             .foregroundStyle(DubplateColor.ground)
             .padding(.horizontal, DubplateLayout.l)
             .frame(height: 32)
@@ -75,7 +75,7 @@ public struct DubplateQuietButtonStyle: ButtonStyle {
 
     public func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 13, weight: .medium))
+            .dubplateFont(.fixed(13, weight: .medium))
             .foregroundStyle(DubplateColor.primaryText.opacity(isEnabled ? 1 : 0.4))
             .padding(.horizontal, DubplateLayout.l)
             .frame(height: 32)
@@ -121,10 +121,10 @@ public struct ErrorBanner: View {
         HStack(alignment: .top, spacing: DubplateLayout.m) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(error.title)
-                    .font(.system(size: 13, weight: .medium))
+                    .dubplateFont(.fixed(13, weight: .medium))
                     .foregroundStyle(DubplateColor.primaryText)
                 Text(subject)
-                    .font(DubplateType.metadata)
+                    .dubplateFont(DubplateType.metadata)
                     .foregroundStyle(DubplateColor.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -137,7 +137,7 @@ public struct ErrorBanner: View {
                 onDismiss()
             } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .semibold))
+                    .dubplateFont(.fixed(11, weight: .semibold))
                     .foregroundStyle(DubplateColor.secondaryText)
                     .frame(width: 28, height: 28)
             }
@@ -179,7 +179,7 @@ public struct Toast: View {
     public var body: some View {
         HStack(spacing: DubplateLayout.m) {
             Text(message)
-                .font(.system(size: 13))
+                .dubplateFont(.fixed(13))
                 .foregroundStyle(DubplateColor.primaryText)
                 .lineLimit(2)
             Spacer(minLength: 0)
@@ -187,7 +187,7 @@ public struct Toast: View {
                 onDismiss()
             } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .semibold))
+                    .dubplateFont(.fixed(10, weight: .semibold))
                     .foregroundStyle(DubplateColor.tertiaryText)
                     .frame(width: 24, height: 24)
             }

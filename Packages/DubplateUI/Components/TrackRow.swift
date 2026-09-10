@@ -42,7 +42,7 @@ public struct TrackRow: View {
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: DubplateLayout.s) {
                     Text(track.displayTitle)
-                        .font(DubplateType.rowTitle)
+                        .dubplateFont(DubplateType.rowTitle)
                         .foregroundStyle(isCurrent ? DubplateColor.accent : DubplateColor.primaryText)
                         .lineLimit(1)
                     if track.explicitFlag {
@@ -51,7 +51,7 @@ public struct TrackRow: View {
                 }
                 if let secondary {
                     Text(secondary)
-                        .font(DubplateType.metadata)
+                        .dubplateFont(DubplateType.metadata)
                         .foregroundStyle(DubplateColor.tertiaryText)
                         .lineLimit(1)
                 }
@@ -70,7 +70,7 @@ public struct TrackRow: View {
             AvailabilityBadge(state: track.availability)
 
             Text(Formatting.duration(track.duration))
-                .font(DubplateType.metadata)
+                .dubplateFont(DubplateType.metadata)
                 .foregroundStyle(DubplateColor.tertiaryText)
                 .frame(minWidth: 40, alignment: .trailing)
 
@@ -79,7 +79,7 @@ public struct TrackRow: View {
             if let onShowVersions {
                 Button(action: onShowVersions) {
                     Image(systemName: "ellipsis")
-                        .font(.system(size: 13, weight: .semibold))
+                        .dubplateFont(.fixed(13, weight: .semibold))
                         .foregroundStyle(DubplateColor.tertiaryText)
                         .frame(width: DubplateLayout.minimumTapTarget, height: DubplateLayout.minimumTapTarget)
                         .contentShape(Rectangle())
@@ -106,14 +106,14 @@ public struct TrackRow: View {
         } else if isHovering {
             Button(action: onPlay) {
                 Image(systemName: "play.fill")
-                    .font(.system(size: 11))
+                    .dubplateFont(.fixed(11))
                     .foregroundStyle(DubplateColor.primaryText)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Play \(track.displayTitle)")
         } else {
             Text("\(track.trackNumber)")
-                .font(DubplateType.metadata)
+                .dubplateFont(DubplateType.metadata)
                 .foregroundStyle(isCurrent ? DubplateColor.accent : DubplateColor.tertiaryText)
         }
     }
@@ -147,7 +147,7 @@ public struct TrackRow: View {
     private var accessibilityDescription: String {
         var parts = ["Track \(track.trackNumber)", track.displayTitle, Formatting.duration(track.duration)]
         if track.versionCount > 1 {
-            parts.append("\(track.versionCount) versions")
+            parts.append("\(track.versionCount) mixes")
         }
         if let explanation = track.availability.listenerExplanation {
             parts.append(explanation)
@@ -173,7 +173,7 @@ public struct VersionPill: View {
 
     public var body: some View {
         Text("\(count) mixes")
-            .font(DubplateType.label)
+            .dubplateFont(DubplateType.label)
             .kerning(0.4)
             .foregroundStyle(isAuditioning ? DubplateColor.ground : DubplateColor.secondaryText)
             .padding(.horizontal, 6)
@@ -189,7 +189,7 @@ public struct ExplicitBadge: View {
 
     public var body: some View {
         Text("E")
-            .font(.system(size: 9, weight: .semibold))
+            .dubplateFont(.fixed(9, weight: .semibold))
             .foregroundStyle(DubplateColor.ground)
             .frame(width: 13, height: 13)
             .background(DubplateColor.tertiaryText, in: RoundedRectangle(cornerRadius: 2.5, style: .continuous))
@@ -215,12 +215,12 @@ public struct AvailabilityBadge: View {
                 .accessibilityLabel("Downloading")
         case .cloudOnly:
             Image(systemName: "arrow.down.circle")
-                .font(.system(size: 12))
+                .dubplateFont(.fixed(12))
                 .foregroundStyle(DubplateColor.tertiaryText)
                 .accessibilityLabel(AvailabilityState.elsewhereDescription)
         case .missing, .error:
             Image(systemName: "exclamationmark.circle")
-                .font(.system(size: 12))
+                .dubplateFont(.fixed(12))
                 .foregroundStyle(DubplateColor.alert)
                 .accessibilityLabel(state == .missing ? "File not found" : "Couldn’t download")
         }

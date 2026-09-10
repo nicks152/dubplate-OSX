@@ -72,7 +72,7 @@ public struct TrackInspectorView: View {
                 VStack(alignment: .leading, spacing: DubplateLayout.xs) {
                     Text("Track").dubplateLabelStyle()
                     Text("\(track.trackNumber) of \(track.release?.trackCount ?? 1)")
-                        .font(DubplateType.metadata)
+                        .dubplateFont(DubplateType.metadata)
                         .foregroundStyle(DubplateColor.secondaryText)
                         .help("Drag the track list to change the running order")
                 }
@@ -93,20 +93,20 @@ public struct TrackInspectorView: View {
             SectionHeader("Current Mix") {
                 Button("All Mixes", action: onShowVersions)
                     .buttonStyle(.plain)
-                    .font(DubplateType.metadata)
+                    .dubplateFont(DubplateType.metadata)
                     .foregroundStyle(DubplateColor.secondaryText)
             }
             if let current = track.currentVersion {
                 Text(current.displayName)
-                    .font(DubplateType.rowTitle)
+                    .dubplateFont(DubplateType.rowTitle)
                     .foregroundStyle(DubplateColor.primaryText)
                     .lineLimit(2)
                 Text("\(track.versionCount) mix\(track.versionCount == 1 ? "" : "es") · \(Formatting.relativeDate(current.createdAt))")
-                    .font(DubplateType.metadata)
+                    .dubplateFont(DubplateType.metadata)
                     .foregroundStyle(DubplateColor.tertiaryText)
             } else {
                 Text("No audio yet")
-                    .font(DubplateType.rowTitle)
+                    .dubplateFont(DubplateType.rowTitle)
                     .foregroundStyle(DubplateColor.tertiaryText)
             }
         }
@@ -117,7 +117,7 @@ public struct TrackInspectorView: View {
             SectionHeader("File")
             if let asset = track.currentAsset {
                 Text(asset.sourceFolder.map { "\($0)/\(asset.originalFilename)" } ?? asset.originalFilename)
-                    .font(DubplateType.metadata)
+                    .dubplateFont(DubplateType.metadata)
                     .foregroundStyle(DubplateColor.secondaryText)
                     .lineLimit(2)
                     .truncationMode(.middle)
@@ -129,14 +129,14 @@ public struct TrackInspectorView: View {
                         Text(loudness)
                     }
                 }
-                .font(DubplateType.metadata)
+                .dubplateFont(DubplateType.metadata)
                 .foregroundStyle(DubplateColor.tertiaryText)
                 Text(Formatting.fileSize(asset.fileSize))
-                    .font(DubplateType.metadata)
+                    .dubplateFont(DubplateType.metadata)
                     .foregroundStyle(DubplateColor.tertiaryText)
             } else {
                 Text("—")
-                    .font(DubplateType.metadata)
+                    .dubplateFont(DubplateType.metadata)
                     .foregroundStyle(DubplateColor.tertiaryText)
             }
         }
@@ -156,7 +156,7 @@ public struct TrackInspectorView: View {
             Text(label).dubplateLabelStyle()
             TextField(placeholder, text: text, axis: axis)
                 .textFieldStyle(.plain)
-                .font(.system(size: 15))
+                .dubplateFont(.fixed(15))
                 .foregroundStyle(DubplateColor.primaryText)
                 .lineLimit(axis == .vertical ? 2...6 : 1)
                 .focused($focusedField, equals: label)

@@ -99,10 +99,10 @@ struct PhoneHomeScreen: View {
                             .dubplateDisplayStyle(.screen)
                             .foregroundStyle(DubplateColor.primaryText)
                         Text(release.artistName)
-                            .font(.system(size: 15))
+                            .dubplateFont(.fixed(15))
                             .foregroundStyle(DubplateColor.secondaryText)
                         Text(release.subtitleLine)
-                            .font(DubplateType.metadata)
+                            .dubplateFont(DubplateType.metadata)
                             .foregroundStyle(DubplateColor.tertiaryText)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -114,7 +114,7 @@ struct PhoneHomeScreen: View {
                     services.play(release: release)
                 } label: {
                     Image(systemName: "play.fill")
-                        .font(.system(size: 17, weight: .semibold))
+                        .dubplateFont(.fixed(17, weight: .semibold))
                         .foregroundStyle(DubplateColor.ground)
                         .frame(width: 52, height: 52)
                         .background(DubplateColor.primaryText, in: Circle())
@@ -150,10 +150,10 @@ struct PhoneHomeScreen: View {
                     } label: {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(result.title)
-                                .font(DubplateType.rowTitle)
+                                .dubplateFont(DubplateType.rowTitle)
                                 .foregroundStyle(DubplateColor.primaryText)
                             Text(result.subtitle)
-                                .font(DubplateType.metadata)
+                                .dubplateFont(DubplateType.metadata)
                                 .foregroundStyle(DubplateColor.tertiaryText)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)

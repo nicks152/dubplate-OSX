@@ -83,7 +83,7 @@ public struct TransportControls: View {
                 ZStack {
                     Circle().fill(tint)
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: size.glyph, weight: .medium))
+                        .dubplateFont(.fixed(size.glyph, weight: .medium))
                         .foregroundStyle(DubplateColor.playerGround)
                         // Optical centring: a play triangle sits left of true centre.
                         .offset(x: player.isPlaying ? 0 : size.glyph * 0.06)
@@ -121,7 +121,7 @@ public struct TransportControls: View {
     private func button(systemName: String, label: String, size glyphSize: CGFloat, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: glyphSize, weight: .medium))
+                .dubplateFont(.fixed(glyphSize, weight: .medium))
                 .foregroundStyle(tint)
                 .frame(width: size.frame, height: size.frame)
                 .contentShape(Rectangle())
@@ -133,7 +133,7 @@ public struct TransportControls: View {
     private func modeButton(systemName: String, isOn: Bool, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: 14, weight: .medium))
+                .dubplateFont(.fixed(14, weight: .medium))
                 .foregroundStyle(isOn ? tint : tint.opacity(0.42))
                 .frame(minWidth: DubplateLayout.minimumTapTarget, minHeight: DubplateLayout.minimumTapTarget)
         }

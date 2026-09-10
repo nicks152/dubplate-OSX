@@ -99,7 +99,7 @@ public struct NowPlayingView: View {
                     onDismiss()
                 } label: {
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 14, weight: .semibold))
+                        .dubplateFont(.fixed(14, weight: .semibold))
                         .foregroundStyle(DubplateColor.playerSecondaryText)
                         .frame(width: DubplateLayout.minimumTapTarget, height: DubplateLayout.minimumTapTarget)
                 }
@@ -137,7 +137,7 @@ public struct PreviewModePicker: View {
                     mode = option
                 } label: {
                     Text(option.displayName)
-                        .font(.system(size: 11, weight: .medium))
+                        .dubplateFont(.fixed(11, weight: .medium))
                         .kerning(0.3)
                         .padding(.horizontal, DubplateLayout.m)
                         .frame(height: 26)

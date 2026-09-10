@@ -44,13 +44,13 @@ public struct StreamModeView: View {
                     Text(player.currentItem?.releaseTitle ?? "")
                         .dubplateLabelStyle(DubplateColor.playerSecondaryText)
                     Text(player.currentItem?.title ?? "")
-                        .font(DubplateType.nowPlayingTitle)
+                        .dubplateFont(DubplateType.nowPlayingTitle)
                         .kerning(-0.48)
                         .foregroundStyle(DubplateColor.playerPrimaryText)
                         .lineLimit(2)
                         .multilineTextAlignment(.center)
                     Text(player.currentItem?.artistName ?? "")
-                        .font(DubplateType.nowPlayingArtist)
+                        .dubplateFont(DubplateType.nowPlayingArtist)
                         .foregroundStyle(DubplateColor.playerSecondaryText)
                         .lineLimit(1)
                 }
@@ -92,7 +92,7 @@ public struct StreamModeView: View {
     private func secondaryButton(_ title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 12, weight: .medium))
+                .dubplateFont(.fixed(12, weight: .medium))
                 .foregroundStyle(DubplateColor.playerSecondaryText)
                 .frame(minHeight: DubplateLayout.minimumTapTarget)
                 .contentShape(Rectangle())

@@ -70,7 +70,7 @@ public struct ScrubBar: View {
                 Spacer()
                 Text("-" + Formatting.duration(max(0, duration - elapsed)))
             }
-            .font(DubplateType.metadata)
+            .dubplateFont(DubplateType.metadata)
             .foregroundStyle(tint.opacity(0.55))
         }
         .task(id: peaks) {

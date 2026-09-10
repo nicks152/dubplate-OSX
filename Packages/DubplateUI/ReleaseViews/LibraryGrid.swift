@@ -86,11 +86,11 @@ public struct ReleaseShelf: View {
                             )
                             .frame(width: cardWidth, height: cardWidth)
                             Text(release.title.isEmpty ? "Untitled" : release.title)
-                                .font(DubplateType.cardTitle)
+                                .dubplateFont(DubplateType.cardTitle)
                                 .foregroundStyle(DubplateColor.primaryText)
                                 .lineLimit(1)
                             Text(release.releaseType.displayName)
-                                .font(DubplateType.metadata)
+                                .dubplateFont(DubplateType.metadata)
                                 .foregroundStyle(DubplateColor.tertiaryText)
                         }
                         .frame(width: cardWidth, alignment: .leading)

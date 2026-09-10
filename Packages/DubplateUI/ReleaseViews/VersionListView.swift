@@ -70,7 +70,7 @@ public struct VersionListView: View {
                 onPlay(version)
             } label: {
                 Image(systemName: playingVersionID == version.id ? "speaker.wave.2.fill" : "play.fill")
-                    .font(.system(size: 11))
+                    .dubplateFont(.fixed(11))
                     .foregroundStyle(isCurrent ? DubplateColor.accent : DubplateColor.secondaryText)
                     .frame(width: 22, height: 22)
             }
@@ -81,22 +81,22 @@ public struct VersionListView: View {
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: DubplateLayout.s) {
                     Text(version.shortName)
-                        .font(DubplateType.metadata)
+                        .dubplateFont(DubplateType.metadata)
                         .foregroundStyle(isCurrent ? DubplateColor.accent : DubplateColor.tertiaryText)
                     Text(version.listeningLabel)
-                        .font(DubplateType.rowTitle)
+                        .dubplateFont(DubplateType.rowTitle)
                         .foregroundStyle(DubplateColor.primaryText)
                         .lineLimit(1)
                 }
                 if let detail = detailLine(for: version) {
                     Text(detail)
-                        .font(DubplateType.metadata)
+                        .dubplateFont(DubplateType.metadata)
                         .foregroundStyle(DubplateColor.tertiaryText)
                         .lineLimit(1)
                 }
                 if let source = sourceLine(for: version) {
                     Text(source)
-                        .font(DubplateType.metadata)
+                        .dubplateFont(DubplateType.metadata)
                         .foregroundStyle(DubplateColor.tertiaryText.opacity(0.8))
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -104,7 +104,7 @@ public struct VersionListView: View {
                 }
                 if let notes = version.notes, !notes.isEmpty {
                     Text(notes)
-                        .font(DubplateType.metadata)
+                        .dubplateFont(DubplateType.metadata)
                         .foregroundStyle(DubplateColor.secondaryText)
                         .lineLimit(2)
                 }
@@ -137,7 +137,7 @@ public struct VersionListView: View {
                 }
             } label: {
                 Image(systemName: "ellipsis")
-                    .font(.system(size: 12, weight: .semibold))
+                    .dubplateFont(.fixed(12, weight: .semibold))
                     .foregroundStyle(DubplateColor.secondaryText)
                     .frame(width: 28, height: 28)
                     .contentShape(Rectangle())

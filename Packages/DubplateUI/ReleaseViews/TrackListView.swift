@@ -79,7 +79,7 @@ public struct TrackListView: View {
                 .contextMenu {
                     Button("Play") { onPlay(track) }
                     if let onShowVersions, track.versionCount > 1 {
-                        Button("Versions…") { onShowVersions(track) }
+                        Button("Mixes…") { onShowVersions(track) }
                     }
                     Divider()
                     if let onRemove {

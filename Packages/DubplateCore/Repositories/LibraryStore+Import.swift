@@ -14,7 +14,7 @@ public struct ImportOutcome: Sendable {
         createdTracks.isEmpty && addedVersions.isEmpty
     }
 
-    /// "8 tracks added" / "New version of Midnight" — one line, past tense.
+    /// "8 tracks added" / "New mix of Midnight" — one line, past tense.
     public func summary(trackTitle: String?) -> String {
         var parts: [String] = []
         if !createdTracks.isEmpty {
@@ -22,9 +22,9 @@ public struct ImportOutcome: Sendable {
         }
         if !addedVersions.isEmpty {
             if addedVersions.count == 1, let trackTitle {
-                parts.append("New version of \(trackTitle)")
+                parts.append("New mix of \(trackTitle)")
             } else {
-                parts.append("\(addedVersions.count) new versions")
+                parts.append("\(addedVersions.count) new mixes")
             }
         }
         if !repairedFilenames.isEmpty {
@@ -42,16 +42,19 @@ public struct ImportOutcome: Sendable {
 
 /// What to do when a bounce is dropped straight onto an existing track.
 public enum TrackDropChoice: String, CaseIterable, Identifiable, Sendable {
+    // Order is the order they are offered in, and the one that deletes a file goes
+    // last. Putting it between the two safe choices is how it gets picked by
+    // someone moving quickly.
     case addAsNewVersion
-    case replaceCurrentVersion
     case createNewTrack
+    case replaceCurrentVersion
 
     public var id: String { rawValue }
 
     public var title: String {
         switch self {
-        case .addAsNewVersion: return "Add as New Version"
-        case .replaceCurrentVersion: return "Replace Current Version"
+        case .addAsNewVersion: return "Add as a New Mix"
+        case .replaceCurrentVersion: return "Replace the Current Mix"
         case .createNewTrack: return "Create New Track"
         }
     }

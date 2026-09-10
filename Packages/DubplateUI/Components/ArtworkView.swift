@@ -105,14 +105,14 @@ public struct MonogramArtwork: View {
                 if edge >= 64 {
                     VStack(alignment: .leading, spacing: edge * 0.02) {
                         Text(displayTitle)
-                            .font(.system(size: edge * 0.15, weight: .semibold))
+                            .dubplateFont(.fixed(edge * 0.15, weight: .semibold))
                             .kerning(edge * -0.0033)
                             .textCase(.uppercase)
                             .foregroundStyle(.white)
                             .lineLimit(3)
                         if !artist.isEmpty {
                             Text(artist)
-                                .font(.system(size: edge * 0.045, weight: .medium))
+                                .dubplateFont(.fixed(edge * 0.045, weight: .medium))
                                 .foregroundStyle(.white.opacity(0.6))
                                 .lineLimit(1)
                         }
@@ -140,5 +140,67 @@ public struct MonogramArtwork: View {
             Color(hue: hue, saturation: 0.12, brightness: 0.30),
             Color(hue: hue, saturation: 0.14, brightness: 0.13)
         ]
+    }
+}
+
+/// A square preview of an image file that is not in the library yet.
+///
+/// Used by the new-release sheet, which had been drawing `ArtworkView(asset: nil)`
+/// for the cover someone had just dropped — and an `ArtworkView` with no asset is
+/// always the monogram, so the artwork was never shown and the filename appeared
+/// where the cover should have been.
+public struct FileArtworkPreview: View {
+    private let url: URL
+    private let fallbackTitle: String
+
+    @State private var image: DubplateImage?
+    @State private var didFail = false
+
+    public init(url: URL, fallbackTitle: String = "") {
+        self.url = url
+        self.fallbackTitle = fallbackTitle
+    }
+
+    public var body: some View {
+        GeometryReader { geometry in
+            let edge = max(geometry.size.width, geometry.size.height)
+            ZStack {
+                if let image {
+                    Image(dubplate: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } else if didFail {
+                    MonogramArtwork(title: fallbackTitle, artist: "")
+                } else {
+                    DubplateColor.sunken
+                }
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+            .clipped()
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: DubplateLayout.artworkRadius(forEdge: edge),
+                    style: .continuous
+                )
+            )
+            .task(id: url) {
+                await load(edge: edge)
+            }
+        }
+        .aspectRatio(1, contentMode: .fit)
+        .accessibilityLabel(didFail ? "That image could not be read" : "Cover preview")
+    }
+
+    private func load(edge: CGFloat) async {
+        let target = url
+        let maxPixel = Int(edge * 3)
+        let loaded = await Task.detached(priority: .userInitiated) { () -> DubplateImage? in
+            guard let cgImage = ImageInspector.cgImage(ofFileAt: target, maxPixel: maxPixel) else {
+                return nil
+            }
+            return DubplateImage.make(from: cgImage)
+        }.value
+        image = loaded
+        didFail = loaded == nil
     }
 }

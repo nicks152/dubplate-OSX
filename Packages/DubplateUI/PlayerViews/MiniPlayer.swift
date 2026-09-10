@@ -67,11 +67,11 @@ public struct MiniPlayer: View {
 
             VStack(alignment: .leading, spacing: 0) {
                 Text(item.title)
-                    .font(.system(size: 13, weight: .medium))
+                    .dubplateFont(.fixed(13, weight: .medium))
                     .foregroundStyle(textColor)
                     .lineLimit(1)
                 Text(item.artistName)
-                    .font(DubplateType.metadata)
+                    .dubplateFont(DubplateType.metadata)
                     .foregroundStyle(secondaryTextColor)
                     .lineLimit(1)
             }
@@ -80,7 +80,7 @@ public struct MiniPlayer: View {
 
             if style == .bar {
                 Text("\(Formatting.duration(player.displayTime)) / \(Formatting.duration(player.duration))")
-                    .font(DubplateType.metadata)
+                    .dubplateFont(DubplateType.metadata)
                     .foregroundStyle(secondaryTextColor)
             }
 

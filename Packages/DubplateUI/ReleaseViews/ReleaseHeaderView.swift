@@ -120,7 +120,7 @@ public struct ReleaseHeaderView: View {
 
                 TextField("Artist", text: $release.artistName)
                     .textFieldStyle(.plain)
-                    .font(.system(size: layout == .centred ? 16 : 18, weight: .medium))
+                    .dubplateFont(.fixed(layout == .centred ? 16 : 18, weight: .medium))
                     .foregroundStyle(DubplateColor.secondaryText)
                     .focused($focusedField, equals: .artist)
                     .onSubmit { commit() }
@@ -131,12 +131,12 @@ public struct ReleaseHeaderView: View {
                     .frame(maxWidth: .infinity, alignment: alignment == .center ? .center : .leading)
 
                 Text(release.artistName)
-                    .font(.system(size: layout == .centred ? 16 : 18, weight: .medium))
+                    .dubplateFont(.fixed(layout == .centred ? 16 : 18, weight: .medium))
                     .foregroundStyle(DubplateColor.secondaryText)
             }
 
             Text(metadataLine)
-                .font(DubplateType.metadata)
+                .dubplateFont(DubplateType.metadata)
                 .foregroundStyle(DubplateColor.tertiaryText)
         }
         .multilineTextAlignment(alignment == .center ? .center : .leading)
