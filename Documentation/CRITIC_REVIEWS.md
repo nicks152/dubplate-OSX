@@ -14,6 +14,11 @@ were then implemented in order, and rounds 2, 5 and 6 each ran against the code 
 stood after the previous round's changes. Nothing was implemented before the round
 that found it.
 
+A finding counts as fixed only once the whole tree has been searched for the same
+shape of mistake. Round 6 found four entries in this file that claimed fixes made in
+one place and missed in another, and that rule is the reason it is written here
+rather than assumed.
+
 ## Standing constraint on every round
 
 There is no Apple toolchain in this environment. No round could build or run the
@@ -437,3 +442,147 @@ the request rate at exactly the moment the server is asking for less.
 gigabytes; hashing all of it at every launch is minutes of disk and battery to detect
 something that has never been observed. The checks were put where corruption actually
 has consequences — at import, and before deleting a local copy.
+
+---
+
+## Round 6 — Final product review
+
+> *Assume Dubplate launches on the App Store tomorrow and will be reviewed publicly
+> by professional musicians. Decide whether it feels like a genuinely finished Apple
+> application rather than a prototype built with AI. Identify anything that would
+> embarrass the product, damage trust or prevent someone from making it part of
+> their music workflow.*
+
+The most useful round of the six, and the least comfortable. Its verdict, in its own
+words, was that this *"reads as a finished Apple application that has never been
+switched on"* — that every defect it found is one you meet in the first four minutes
+of using the thing and none is one you find by reading it, which is exactly the shape
+of a product reviewed six times and run zero times.
+
+It listed three blockers, twelve serious findings, sixteen worth fixing and eleven
+nits. Every one was checked against the code before being acted on; all of them held.
+
+### The three blockers
+
+**Dropping a bounce folder on the library did nothing at all.** Both the library and
+the Inbox filtered the drop on an audio extension, which a directory URL does not
+have, so the handler returned `false` and not even the drop overlay appeared. This is
+round 1's finding S7 — *"every handler filtered on an audio extension, which a
+directory URL does not have"* — fixed in four handlers and missed in the two that
+matter most: the launch screen, whose own empty state says *"Drop a folder of bounces
+here."* The file containing the fix carries a comment explaining why refusing that
+gesture would be unforgivable.
+
+Folders are now accepted on sight, by a cheap test that does not walk them while
+Finder waits, and expanded afterwards. The cover inside the folder comes with them,
+an empty folder says so rather than leaving an empty record behind, and loose files
+no longer produce a record named "Desktop".
+
+**There was no app icon and no asset catalog** — no `.xcassets`, no
+`ASSETCATALOG_COMPILER_APPICON_NAME` in any configuration. App Store Connect rejects
+an upload without one, and sideloaded it is a blank tile in the Dock of an
+application about how records look. There is one now, drawn procedurally by
+`Tools/make_app_icon.py`: a pale acetate on the application's own near-black ground,
+with the lathe grooves that tell a dubplate from a pressing, an unprinted centre and
+the spindle hole. Rendered at four times each size and box-filtered, so it survives
+down to 16 points.
+
+**The iPhone launch screen was white.** `UIColorName` was an empty string, which
+resolves to nothing, so a pure-black application began every launch with a full-screen
+white flash. It is the application's ground.
+
+### Serious
+
+- **The inspector's Featured field discarded every keystroke.**
+  `Binding($track.featuredArtists) ?? .constant("")` — the failable initialiser
+  returns nil while the optional is nil, which is every track whose filename did not
+  say "feat.", so the constant took over. The `Notes` field five lines below had this
+  right. A control that looks editable and silently is not is the exact failure round
+  3 wrote its standing test about.
+- **The retry button could never appear, and the copy promised it.** Both call sites
+  used the trailing-closure form, which binds `onDismiss`, so `onRetry` was nil
+  everywhere while `.transferFailed` said *"You can also retry now."* Recorded as
+  fixed after round 1; it was not. It is wired to real actions now, and `"Locate
+  File…"` is gone because there is no locate flow for it to reach.
+- **⌘N was bound twice in the same window**, one file away from where round 3 found
+  and fixed the same thing on Space. And Space itself was a bare menu key equivalent
+  competing with two live text fields — AppKit offers menu equivalents before the
+  field editor, so it would have eaten the space bar in the middle of a release
+  title. Space stays where every music application puts it and stands down while a
+  field has focus, which is what `@FocusedValue` was published for.
+- **⌘I was enabled and inert on four of five screens.** It is disabled where nothing
+  can answer it.
+- **Dynamic Type was not supported at all**: sixty-two raw `.system(size:)` calls, a
+  table of raw CGFloats, and no `@ScaledMetric`, `relativeTo:` or text style
+  anywhere. `QA.md` listed a Dynamic Type check that passed only because nothing
+  moved. Each style now keeps the size the design chose and scales with the system
+  text style closest to its role, with a tighter ceiling on display type, which is
+  set at a size *and* a tracking that stop working together past a point.
+- **"Version" and "mix" were used interchangeably in eleven user-visible places**,
+  including one line that managed both: *"No versions — this track only has one
+  mix."* Round 2 recorded imposing one vocabulary. It is one now.
+- **Both apps declared themselves handlers for every audio file on the machine and
+  had no handler.** The Mac has one; the phone, whose importer round 1 deliberately
+  deleted, no longer advertises one.
+- **The iPhone app shipped to iPad with no iPad design** — a portrait stack with a
+  floating pill, at 1366 points wide. iPhone only.
+- **The Mac had no push entitlement**, so iPhone → Mac changes would only land on
+  relaunch, against the promise in `SYNC.md`.
+- **A comment claimed file opening happened off the main actor** on the hottest line
+  in the product, where it plainly does not. Corrected to say what happens and why,
+  including what would have to change first — `AVAudioFile` is not Sendable and the
+  engine holds it.
+- **The new-release sheet never showed the cover you had just dropped**: it drew
+  `ArtworkView(asset: nil)`, which is always the monogram, so the filename appeared
+  where the artwork should have been.
+
+### Worth fixing
+
+Thirteen public declarations existed and were called by nothing. Three were worth
+having and are wired up rather than deleted — the cover's dimensions are measured on
+every import and a soft cover was detected and never mentioned; a cover whose bytes
+are present and will not decode now says so instead of silently becoming a monogram.
+The other ten are gone.
+
+The rest: the playing row was distinguished by a colour identical to the one it was
+distinguished from (the accent is maximum contrast by design, not a hue) and is now a
+step of weight; VoiceOver was told the mini player opens the player and given no way
+to do it; the Explicit switch had no name; the toast — the product's only channel for
+"here is what that drop did" — was never announced; a single-tap gesture on every
+row duplicated the List's own selection and made each click wait out the double-click
+window; three more paths failed in silence; `report()` compared against a copy string
+duplicated from another file in branches that could not be reached; Appearance
+applied to one of three scenes; the window always reopened on Albums; the default
+Help item led to "Help isn't available for Dubplate"; the copyright string was empty
+and neither target declared its export-compliance answer.
+
+Eleven nits, mostly copy that had drifted from the code it described: "eight
+switches" over five preferences, a `"Zero KB"` that reads as a measurement of
+something never measured, a documented sample output `RelativeDateTimeFormatter`
+cannot produce, a nested `State` shadowing the property wrapper in a view that uses
+both, and the preview mode filed under Appearance.
+
+The eight design renderings were redrawn, because they had drifted too: a Disc field
+round 1 deleted, a toolbar reading "Phone Preview", two overflow controls on one row,
+and a capitalised "Yesterday".
+
+### Rejected
+
+Nothing in this round was rejected. Every finding was checked against the code and
+every one of them held — including four that earlier rounds had recorded as fixed and
+were not, which is the finding underneath all the others.
+
+### The thing it said that matters most
+
+> *Documentation that describes work more completely than the work was done is the
+> most specific machine signature in the repository, and it is more damaging than any
+> single bug, because it is the thing a reviewer would quote.*
+
+Four entries in this file claimed fixes that were incomplete: the folder-drop
+handlers, the retry button, the single vocabulary, and one of two `assumeIsolated`
+sites. That is not a documentation problem, it is a verification problem: a fix was
+made where it was found and never swept for elsewhere. The rule this file operates
+under from here is that a finding is recorded as fixed only after the whole tree has
+been searched for the same shape — which is how the four above were finally closed,
+and how the fifth (`adopt(record:)` marking a description as an upload, the same
+mistake round 5 found on the send path) was found before any critic reached it.

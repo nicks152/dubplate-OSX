@@ -10,7 +10,7 @@ What *has* been run, and what it establishes:
 
 | Check | Result | What it establishes |
 | --- | --- | --- |
-| `python3 Tools/swiftcheck.py` | 108 files, 16,119 lines, **0 errors, 0 warnings** | Delimiters balance; no duplicate declarations; every import matches a declared dependency; ~2,000 capitalised identifiers all resolve to a declaration in scope or a reviewed platform symbol; every `@Model` obeys CloudKit's rules, including that every relationship has an inverse; every `@Environment` read has a matching injection in each application; no force unwraps, `try!`, `as!`, `print(`, or oversized files |
+| `python3 Tools/swiftcheck.py` | 109 files, 16,557 lines, **0 errors, 0 warnings** | Delimiters balance; no duplicate declarations; every import matches a declared dependency; ~2,000 capitalised identifiers all resolve to a declaration in scope or a reviewed platform symbol; every `@Model` obeys CloudKit's rules, including that every relationship has an inverse; every `@Environment` read has a matching injection in each application; no force unwraps, `try!`, `as!`, `print(`, or oversized files |
 | `python3 Tools/pbxcheck.py` | 95 objects, 4 targets, **0 problems** | The Xcode project parses as an OpenStep plist; every object reference resolves; every file reference exists on disk; every target has a sources phase and compiles at least one file |
 | `python3 Tools/heuristics_reference.py` | **35/35 cases pass** | The filename and version-matching rules behave as intended on a table of real bounce names |
 | BS.1770 coefficients, checked numerically | max error 4e-14 vs the published 48 kHz values | The K-weighting filters are correct, so loudness numbers are not all wrong by a constant |
@@ -147,10 +147,24 @@ concern in the design, not from a checklist.
 - A 300-character track title.
 - Quit during an import.
 
+### Mac conventions
+- ⌘N from the library, from a release, and with the cursor in a release title — the
+  last of these must make a release, not type an "n".
+- Space with the cursor in a release title types a space. Space anywhere else is
+  play/pause.
+- ⌘I on the library: greyed out. ⌘I on a release: the importer opens.
+- Choose Dubplate from Finder's Open With for one WAV, and for eight at once.
+- Quit with a release open; relaunch; the same release is open.
+- Set Appearance to Dark on a Light Mac and open Settings and the iPhone window.
+
 ### Accessibility
 - VoiceOver through the library, a release, and Now Playing — every control has a
   label; track rows read as "Track 6, Midnight, 3:42, 4 versions".
-- Dynamic Type at the largest setting: nothing clips, nothing overlaps.
+- Dynamic Type at every step including the accessibility sizes: type actually grows,
+  nothing clips, and a sleeve title wraps to three lines rather than shrinking.
+- VoiceOver: the mini player is a button and opens the player; the Explicit switch
+  is named; a toast is announced when it appears; a cover that will not decode says
+  so rather than reading as a record with no artwork.
 - Reduce Motion: the playing indicator stops animating; transitions flatten.
 - Keyboard only on the Mac: sidebar, grid, track list, transport.
 - Contrast: check secondary and tertiary text against the ground at both appearances.
