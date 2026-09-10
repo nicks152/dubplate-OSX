@@ -2,19 +2,21 @@ import Foundation
 import CloudKit
 import DubplateCore
 
-/// Moves audio and artwork between devices through the user's own private
-/// CloudKit database.
+/// Keeps every device's *catalogue* of media in step: which files exist, how big
+/// they are, what they are called and where they belong.
 ///
-/// Why CloudKit and not iCloud Drive: the metadata already syncs through CloudKit
-/// via SwiftData, so the media travels on the same account, in the same private
-/// database, with one set of rules about what is available where. Why `CKSyncEngine`
-/// and not hand-rolled operations: it owns the change tokens, the retry schedule,
-/// the throttling and the resumption after a relaunch — all of the parts that are
-/// easy to write and very hard to write correctly.
+/// It deliberately does not move the bytes. `CKSyncEngine` fetches every change in
+/// the zone as soon as it appears, which is exactly right for a few hundred bytes
+/// of description and exactly wrong for a forty-minute 96/24 master: a phone would
+/// fill up with an entire back catalogue nobody asked it to hold. So the engine
+/// syncs descriptions, `MediaTransferService` moves bytes on request, and a track
+/// whose description has arrived but whose audio has not is what the interface calls
+/// "Available on your Mac".
 ///
-/// Records are one per asset, named by the asset's identifier, carrying the file as
-/// a `CKAsset`. Nothing here is ever public: no share, no public database, no URL
-/// that exists outside the account.
+/// Why CloudKit at all: the metadata already syncs through it via SwiftData, so the
+/// media travels on the same account, in the same private database, under one set of
+/// rules. Nothing here is ever public — no share, no public database, no URL that
+/// exists outside the account.
 public actor MediaSyncEngine {
 
     public struct Configuration: Sendable {
@@ -41,9 +43,9 @@ public actor MediaSyncEngine {
         static let originalFilename = "originalFilename"
         static let checksum = "checksum"
         static let fileSize = "fileSize"
-        static let file = "file"
     }
 
+    /// The description of a file. Small, and safe to fetch everywhere.
     static let recordType = "DubplateMedia"
 
     private let configuration: Configuration
@@ -233,7 +235,6 @@ extension MediaSyncEngine: CKSyncEngineDelegate {
         else {
             return nil
         }
-        let fileURL = mediaStore.url(forRelativePath: descriptor.relativePath)
         guard mediaStore.exists(relativePath: descriptor.relativePath) else {
             // The file has gone from under us. Drop it from the queue rather than
             // failing this batch and every batch after it.
@@ -248,45 +249,37 @@ extension MediaSyncEngine: CKSyncEngineDelegate {
         record[Field.originalFilename] = descriptor.originalFilename
         record[Field.checksum] = descriptor.checksum
         record[Field.fileSize] = descriptor.fileSize
-        record[Field.file] = CKAsset(fileURL: fileURL)
         return record
     }
 
+    /// A description arrived from another device. Record it, and say whether the
+    /// bytes behind it happen to be here already.
     private func adopt(record: CKRecord) async {
         guard let assetID = UUID(uuidString: record.recordID.recordName),
-              let relativePath = record[Field.relativePath] as? String
+              let relativePath = record[Field.relativePath] as? String,
+              let kindRaw = record[Field.kind] as? String,
+              let kind = MediaDescriptor.Kind(rawValue: kindRaw)
         else {
             return
         }
-        guard let asset = record[Field.file] as? CKAsset, let temporary = asset.fileURL else {
-            await onAvailabilityChanged?(assetID, .cloudOnly)
-            return
-        }
 
-        if let kindRaw = record[Field.kind] as? String, let kind = MediaDescriptor.Kind(rawValue: kindRaw) {
-            await index.record(
-                MediaDescriptor(
-                    assetID: assetID,
-                    kind: kind,
-                    relativePath: relativePath,
-                    originalFilename: record[Field.originalFilename] as? String ?? "",
-                    checksum: record[Field.checksum] as? String ?? "",
-                    fileSize: record[Field.fileSize] as? Int64 ?? 0,
-                    isUploaded: true
-                )
+        await index.record(
+            MediaDescriptor(
+                assetID: assetID,
+                kind: kind,
+                relativePath: relativePath,
+                originalFilename: record[Field.originalFilename] as? String ?? "",
+                checksum: record[Field.checksum] as? String ?? "",
+                fileSize: record[Field.fileSize] as? Int64 ?? 0,
+                isUploaded: true
             )
-        }
+        )
 
-        do {
-            // CloudKit hands over a temporary file it will delete; move it, do not
-            // copy, so a 300 MB WAV is not written twice.
-            try mediaStore.adopt(temporaryFile: temporary, asRelativePath: relativePath)
+        if mediaStore.exists(relativePath: relativePath) {
             await onAssetArrived?(assetID, relativePath)
             await onAvailabilityChanged?(assetID, .available)
-            Log.sync.info("Media arrived for asset \(assetID.uuidString, privacy: .public)")
-        } catch {
-            Log.sync.error("Could not store downloaded media: \(String(describing: error))")
-            await onAvailabilityChanged?(assetID, .error)
+        } else {
+            await onAvailabilityChanged?(assetID, .cloudOnly)
         }
     }
 
@@ -302,9 +295,9 @@ extension MediaSyncEngine: CKSyncEngineDelegate {
         guard let assetID = UUID(uuidString: failure.record.recordID.recordName) else { return }
         switch failure.error.code {
         case .serverRecordChanged:
-            // Another device uploaded this asset first. Its bytes are identical by
-            // construction — the record name is the asset identifier, and assets are
-            // immutable once written — so accepting the server's copy is correct.
+            // Another device described this asset first. Descriptions are immutable
+            // once written — the record name is the asset identifier and an asset's
+            // contents never change — so the server's copy is already correct.
             await index.markUploaded(assetID)
         case .zoneNotFound, .userDeletedZone:
             let zoneID = CKRecordZone.ID(zoneName: configuration.zoneName)

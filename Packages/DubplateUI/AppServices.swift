@@ -150,6 +150,28 @@ public final class AppServices {
         analyser.analysePending()
     }
 
+    // MARK: - Offline
+
+    /// Brings every current version of a release onto this device.
+    public func download(release: Release) async {
+        let assets = release.orderedTracks.compactMap(\.currentAsset)
+        var ids = assets.map(\.id)
+        if let artworkAsset = release.artwork { ids.append(artworkAsset.id) }
+        for asset in assets where asset.availability == .cloudOnly {
+            asset.availability = .downloading
+        }
+        try? container.mainContext.save()
+        await sync.download(assetIDs: ids)
+    }
+
+    /// Frees the space a release takes on this device, leaving iCloud alone.
+    public func removeDownload(for release: Release) async {
+        let ids = release.orderedTracks
+            .flatMap { $0.versions ?? [] }
+            .compactMap(\.audioAsset?.id)
+        await sync.removeDownloads(assetIDs: ids)
+    }
+
     /// Keeps the queue in step when the current version of a queued track changes.
     public func refreshQueueEntry(for track: Track) {
         guard let existing = player.queue.items.first(where: { $0.trackID == track.id }),

@@ -45,8 +45,12 @@ public final class SyncCoordinator {
     public private(set) var lastSyncedAt: Date?
     public private(set) var isEnabled: Bool
 
+    /// Files currently moving in either direction.
+    public private(set) var transfers: [MediaTransferService.Transfer] = []
+
     private let account = CloudAccount()
     private let engine: MediaSyncEngine
+    private let transferService: MediaTransferService
     private let index: MediaIndex
     private let context: ModelContext
     private let mediaStore: MediaStore
@@ -67,6 +71,7 @@ public final class SyncCoordinator {
             mediaStore: mediaStore,
             index: index
         )
+        self.transferService = MediaTransferService(mediaStore: mediaStore, index: index)
     }
 
     // MARK: - Lifecycle
@@ -93,6 +98,12 @@ public final class SyncCoordinator {
             onActivityChanged: onActivity
         )
         await engine.start()
+        await transferService.setCallbacks(
+            onProgress: { [weak self] active in
+                await self?.setTransfers(active)
+            },
+            onAvailabilityChanged: onAvailability
+        )
         await backfillIndex()
         watchAccountChanges()
         status = .synced
@@ -120,8 +131,46 @@ public final class SyncCoordinator {
         status = .syncing
         await engine.sendChangesNow()
         await engine.fetchChangesNow()
+        await uploadAnythingOutstanding()
         lastSyncedAt = Date()
         status = .synced
+    }
+
+    // MARK: - Moving bytes
+
+    /// Puts the bytes for these assets on this device.
+    public func download(assetIDs: [UUID]) async {
+        guard isEnabled, accountState.canSync, !assetIDs.isEmpty else { return }
+        status = .downloading
+        await transferService.clearCancellations()
+        await transferService.download(assetIDs)
+        status = .synced
+    }
+
+    /// Frees the space these assets take on this device. The iCloud copy is
+    /// untouched, and anything that has not been uploaded yet is refused.
+    public func removeDownloads(assetIDs: [UUID]) async {
+        await transferService.removeLocalCopies(assetIDs)
+    }
+
+    public func cancelTransfers(assetIDs: [UUID]) async {
+        await transferService.cancel(assetIDs)
+    }
+
+    /// Uploads anything this device has that iCloud does not.
+    private func uploadAnythingOutstanding() async {
+        let pending = await index.pendingUploads()
+        guard !pending.isEmpty else { return }
+        await transferService.upload(pending.map(\.assetID))
+    }
+
+    private func setTransfers(_ active: [MediaTransferService.Transfer]) {
+        transfers = active
+        if !active.isEmpty {
+            status = active.contains(where: { !$0.isUpload }) ? .downloading : .syncing
+        } else if status == .downloading || status == .syncing {
+            status = .synced
+        }
     }
 
     // MARK: - Registering media
@@ -140,7 +189,9 @@ public final class SyncCoordinator {
         }
         await index.record(descriptors)
         guard isEnabled, accountState.canSync else { return }
-        await engine.queueUploads(descriptors.map(\.assetID))
+        let ids = descriptors.map(\.assetID)
+        await engine.queueUploads(ids)
+        await transferService.upload(ids)
     }
 
     public func register(artworkAssets: [ArtworkAsset]) async {
@@ -156,11 +207,16 @@ public final class SyncCoordinator {
         }
         await index.record(descriptors)
         guard isEnabled, accountState.canSync else { return }
-        await engine.queueUploads(descriptors.map(\.assetID))
+        let ids = descriptors.map(\.assetID)
+        await engine.queueUploads(ids)
+        await transferService.upload(ids)
     }
 
+    /// Called when the person deletes a release: the description and the bytes both
+    /// go, on every device.
     public func forget(assetIDs: [UUID]) async {
         await engine.queueDeletions(assetIDs)
+        await transferService.deleteRemote(assetIDs)
         for assetID in assetIDs {
             await index.remove(assetID)
         }
