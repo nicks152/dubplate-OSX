@@ -29,6 +29,17 @@ public final class AudioSessionCoordinator {
     public init() {}
 
     #if os(iOS)
+    /// Whether audio would come out of the phone's own speaker right now.
+    ///
+    /// Asked before resuming after the engine rebuilds itself: a rebuild that
+    /// happens to coincide with headphones coming out must not put an unreleased
+    /// record into the room.
+    public var isRoutedToBuiltInSpeaker: Bool {
+        AVAudioSession.sharedInstance().currentRoute.outputs.contains {
+            $0.portType == .builtInSpeaker
+        }
+    }
+
     public func activate() {
         let session = AVAudioSession.sharedInstance()
         do {
@@ -112,6 +123,10 @@ public final class AudioSessionCoordinator {
         }
     }
     #else
+    /// A Mac has no built-in-speaker special case: unplugging headphones moves the
+    /// output to whatever the person chose in Sound, which is their decision.
+    public var isRoutedToBuiltInSpeaker: Bool { false }
+
     public func activate() {
         isConfigured = true
     }

@@ -60,7 +60,11 @@ public final class PlaybackEngine {
     /// Called on the main actor when a scheduled item has finished rendering.
     public var itemDidFinish: ((UUID) -> Void)?
     /// Called when the engine had to be rebuilt underneath playback.
-    public var configurationDidChange: (() -> Void)?
+    ///
+    /// The rebuilt graph is always left silent, and `wasPlaying` says whether the
+    /// music was running before it. Resuming is the controller's call, because
+    /// from down here a headphone unplug and an AirPlay handover look identical.
+    public var configurationDidChange: ((_ wasPlaying: Bool) -> Void)?
 
     /// Kept so the observer can be removed; one leaked observer per engine is one
     /// too many for something this long-lived.
@@ -107,20 +111,37 @@ public final class PlaybackEngine {
     // MARK: - Transport
 
     /// Starts an item, discarding anything currently scheduled.
+    ///
+    /// Throwing leaves the engine genuinely stopped rather than half-torn-down.
+    /// Seeking is implemented on top of this, and a seek that failed — an audio
+    /// session that could not be activated, a graph that would not start — used to
+    /// leave `currentItemID` pointing at a track with nothing scheduled behind it
+    /// and `isPlaying` still true, so the transport went on counting through
+    /// silence. Every field is cleared before the fallible work begins and only
+    /// set once the graph is up.
     public func start(item id: UUID, file: AVAudioFile, at offset: TimeInterval = 0) throws {
         player.stop()
         scheduled.removeAll()
+        currentItemID = nil
+        isPlaying = false
+        pausedAt = 0
 
-        try connect(for: file.processingFormat)
-        try startEngineIfNeeded()
+        do {
+            try connect(for: file.processingFormat)
+            try startEngineIfNeeded()
+        } catch {
+            isConnected = false
+            currentFormat = nil
+            throw error
+        }
 
         currentItemID = id
         pausedAt = offset
         guard try schedule(id: id, file: file, from: offset, startingAt: 0) else {
             // Nothing to render — an empty or truncated file. Report it and leave
             // the transport stopped rather than claiming to be playing silence.
-            isPlaying = false
             currentItemID = nil
+            pausedAt = 0
             reportFinished(id)
             return
         }
@@ -309,7 +330,13 @@ public final class PlaybackEngine {
     }
 
     /// A route change (headphones out, AirPlay in) tears the engine's graph down.
-    /// Rebuild it and pick up where the music was.
+    /// Rebuild it, positioned where the music was, and leave it paused.
+    ///
+    /// The graph is rebuilt but never restarted here. Unplugging headphones and
+    /// handing over to a car stereo produce the same notification, and the
+    /// notification that tells them apart arrives separately with no ordering
+    /// guarantee. Playing first and asking afterwards is how a private record ends
+    /// up out of a phone's speaker in a room full of people.
     private func handleConfigurationChange() {
         Log.audio.info("Audio engine configuration changed; rebuilding graph")
         guard let currentItemID,
@@ -317,6 +344,7 @@ public final class PlaybackEngine {
         else {
             isConnected = false
             currentFormat = nil
+            configurationDidChange?(false)
             return
         }
         let position = currentTime
@@ -331,15 +359,13 @@ public final class PlaybackEngine {
             for item in pending {
                 _ = try? enqueue(item: item.itemID, file: item.file)
             }
-            if !wasPlaying {
-                pausedAt = position
-                player.pause()
-                isPlaying = false
-            }
+            pausedAt = position
+            player.pause()
+            isPlaying = false
         } catch {
             Log.audio.error("Could not rebuild audio graph: \(String(describing: error))")
             isPlaying = false
         }
-        configurationDidChange?()
+        configurationDidChange?(wasPlaying)
     }
 }

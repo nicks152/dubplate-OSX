@@ -16,12 +16,12 @@ public final class PlayerController {
     // MARK: - Observable state
 
     public private(set) var queue = PlaybackQueue()
-    public private(set) var isPlaying = false
+    public internal(set) var isPlaying = false
     /// Position in the current item, updated a few times a second while playing.
-    public private(set) var currentTime: TimeInterval = 0
+    public internal(set) var currentTime: TimeInterval = 0
     /// Set while a scrub is in progress so the bar follows the finger, not the clock.
     public var scrubTime: TimeInterval?
-    public private(set) var lastError: DubplateError?
+    public internal(set) var lastError: DubplateError?
     /// False when the next track changes sample rate, so the join cannot be
     /// gapless. Read by the release page, which is where it can be acted on.
     public private(set) var nextTransitionIsGapless = true
@@ -46,16 +46,23 @@ public final class PlayerController {
 
     // MARK: - Collaborators
 
-    private let engine = PlaybackEngine()
-    private let session = AudioSessionCoordinator()
-    private let nowPlaying = NowPlayingCoordinator()
+    let engine = PlaybackEngine()
+    let session = AudioSessionCoordinator()
+    let nowPlaying = NowPlayingCoordinator()
     private let mediaStore: MediaStore
 
-    private var ticker: Task<Void, Never>?
+    var ticker: Task<Void, Never>?
     private var enqueuedItemIDs: Set<UUID> = []
     /// The item a download was requested for ahead of time, so it is asked for once.
     private var requestedAheadOf: UUID?
-    private var wasPlayingBeforeInterruption = false
+    var wasPlayingBeforeInterruption = false
+    /// True when the music was last heard through something other than the phone's
+    /// own speaker. Consulted before a rebuilt graph is restarted.
+    var wasPlayingOnExternalRoute = false
+    /// Tracks passed over because their audio would not play, since the last thing
+    /// the person actually asked for. Without it, repeat plus a record whose files
+    /// have not arrived is a queue that never stops turning.
+    private var skippedSinceUserAction: Set<UUID> = []
     /// Called when a release starts playing, so the library can record it.
     public var didStartRelease: ((UUID) -> Void)?
     /// Called when a track is asked for whose audio is not on this device.
@@ -71,8 +78,8 @@ public final class PlayerController {
         engine.itemDidFinish = { [weak self] id in
             self?.handleItemFinished(id)
         }
-        engine.configurationDidChange = { [weak self] in
-            self?.refreshNowPlaying()
+        engine.configurationDidChange = { [weak self] wasPlaying in
+            self?.handleConfigurationChange(wasPlaying: wasPlaying)
         }
         session.onInterruption = { [weak self] interruption in
             self?.handle(interruption)
@@ -112,6 +119,7 @@ public final class PlayerController {
             queue.jump(toItemWithID: first.id)
         }
         enqueuedItemIDs.removeAll()
+        skippedSinceUserAction.removeAll()
         startCurrentItem(from: 0)
         if let releaseID = queue.current?.releaseID {
             didStartRelease?(releaseID)
@@ -147,6 +155,7 @@ public final class PlayerController {
         do {
             try engine.resume()
             isPlaying = true
+            wasPlayingOnExternalRoute = !session.isRoutedToBuiltInSpeaker
             startTicking()
             refreshNowPlaying()
         } catch let error as DubplateError {
@@ -160,6 +169,8 @@ public final class PlayerController {
         engine.stop()
         queue.clear()
         enqueuedItemIDs.removeAll()
+        skippedSinceUserAction.removeAll()
+        awaitingDownloadOf = nil
         isPlaying = false
         currentTime = 0
         stopTicking()
@@ -170,6 +181,7 @@ public final class PlayerController {
     /// Next track. At the end of a queue this stops rather than wrapping, unless
     /// repeat is on.
     public func next() {
+        skippedSinceUserAction.removeAll()
         guard queue.advance(userInitiated: true) else {
             pause()
             seek(to: 0)
@@ -186,6 +198,7 @@ public final class PlayerController {
             seek(to: 0)
             return
         }
+        skippedSinceUserAction.removeAll()
         guard queue.goBack() else {
             seek(to: 0)
             return
@@ -195,6 +208,7 @@ public final class PlayerController {
     }
 
     public func skip(to item: PlaybackQueueItem) {
+        skippedSinceUserAction.removeAll()
         queue.jump(toItemWithID: item.id)
         enqueuedItemIDs.removeAll()
         startCurrentItem(from: 0)
@@ -287,6 +301,13 @@ public final class PlayerController {
         guard let item = queue.current else { return }
         guard canPlay(item) else {
             // Hold here and ask for the file, rather than skipping past it.
+            //
+            // The engine has to be stopped first. It is still rendering the track
+            // that ran into this one, so simply setting `isPlaying = false` left
+            // the previous song playing out of the headphones while the interface
+            // showed this one, paused — and the next press of play resumed that
+            // old track rather than this one.
+            engine.stop()
             let alreadyAsking = awaitingDownloadOf?.id == item.id
             awaitingDownloadOf = item
             isPlaying = false
@@ -309,6 +330,8 @@ public final class PlayerController {
             try engine.start(item: item.id, file: file, at: offset)
             isPlaying = true
             currentTime = offset
+            wasPlayingOnExternalRoute = !session.isRoutedToBuiltInSpeaker
+            skippedSinceUserAction.removeAll()
             enqueuedItemIDs = [item.id]
             startTicking()
             refreshNowPlaying()
@@ -322,11 +345,39 @@ public final class PlayerController {
         }
     }
 
+    /// Moves past a track that would not play, and knows when to give up.
+    ///
+    /// `startCurrentItem` calls back into this on failure, so with repeat on and a
+    /// record whose files are all unreadable the two used to call each other around
+    /// the queue without end. Remembering what has already been tried since the
+    /// person last asked for something turns that into one pass: every track gets a
+    /// chance, and when none of them plays the record stops with an error rather
+    /// than spinning.
     private func skipUnplayable() {
         isPlaying = false
-        if queue.advance(userInitiated: true) {
-            startCurrentItem(from: 0)
+        guard let failed = queue.current else {
+            stopTicking()
+            refreshNowPlaying()
+            return
         }
+        skippedSinceUserAction.insert(failed.id)
+
+        guard queue.advance(userInitiated: true) else {
+            engine.stop()
+            stopTicking()
+            skippedSinceUserAction.removeAll()
+            refreshNowPlaying()
+            return
+        }
+        guard let next = queue.current, !skippedSinceUserAction.contains(next.id) else {
+            engine.stop()
+            stopTicking()
+            skippedSinceUserAction.removeAll()
+            report(DubplateError(.playbackFailed, subject: failed.title))
+            refreshNowPlaying()
+            return
+        }
+        startCurrentItem(from: 0)
     }
 
     /// Whether the bytes are actually on disk right now.
@@ -349,6 +400,7 @@ public final class PlayerController {
         }
         guard canPlay(waiting) else { return }
         awaitingDownloadOf = nil
+        skippedSinceUserAction.remove(waiting.id)
         startCurrentItem(from: 0)
     }
 
@@ -422,79 +474,5 @@ public final class PlayerController {
         } else {
             startCurrentItem(from: 0)
         }
-    }
-
-    // MARK: - Interruptions
-
-    private func handle(_ interruption: AudioInterruption) {
-        switch interruption {
-        case .began:
-            wasPlayingBeforeInterruption = isPlaying
-            pause()
-        case .ended(let shouldResume):
-            if shouldResume, wasPlayingBeforeInterruption {
-                resume()
-            }
-            wasPlayingBeforeInterruption = false
-        case .routeLost:
-            pause()
-        case .routeChanged:
-            refreshNowPlaying()
-        }
-    }
-
-    // MARK: - Ticking
-
-    private func startTicking() {
-        guard ticker == nil else { return }
-        ticker = Task { [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(200))
-                guard let self else { return }
-                await MainActor.run {
-                    self.tick()
-                }
-            }
-        }
-    }
-
-    private func stopTicking() {
-        ticker?.cancel()
-        ticker = nil
-    }
-
-    /// Moves the interface's playhead. Now Playing is not touched here: the system
-    /// extrapolates it from the rate, and republishing on a timer costs an XPC round
-    /// trip several times a second for the length of a record.
-    private func tick() {
-        guard isPlaying else { return }
-        if scrubTime == nil {
-            currentTime = engine.currentTime
-        }
-    }
-
-    /// Called when a cover changes, so the Lock Screen does not keep the old one.
-    public func invalidateArtwork() {
-        nowPlaying.invalidateAllArtwork()
-        refreshNowPlaying()
-    }
-
-    private func refreshNowPlaying() {
-        let position = queue.currentIndex.map { (index: $0, count: queue.items.count) }
-        nowPlaying.update(
-            item: queue.current,
-            isPlaying: isPlaying,
-            elapsed: currentTime,
-            queuePosition: position
-        )
-    }
-
-    private func report(_ error: DubplateError) {
-        Log.audio.error("Playback error: \(error.title, privacy: .public)")
-        lastError = error
-    }
-
-    public func clearError() {
-        lastError = nil
     }
 }
