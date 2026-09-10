@@ -12,6 +12,7 @@ public struct DubplateError: LocalizedError, Identifiable, Sendable {
         case notDownloadedYet
         case iCloudUnavailable
         case iCloudSignedOut
+        case syncNotConfigured
         case storageFull
         case transferFailed
         case artworkUnreadable
@@ -46,6 +47,8 @@ public struct DubplateError: LocalizedError, Identifiable, Sendable {
             return "iCloud isn’t reachable right now."
         case .iCloudSignedOut:
             return "Sign in to iCloud to sync your releases."
+        case .syncNotConfigured:
+            return "This copy of Dubplate doesn’t sync."
         case .storageFull:
             return "There isn’t enough space to store this."
         case .transferFailed:
@@ -71,6 +74,8 @@ public struct DubplateError: LocalizedError, Identifiable, Sendable {
             return "Your work is saved on this device and will sync when iCloud comes back."
         case .iCloudSignedOut:
             return "Dubplate works without iCloud — your releases just stay on this device."
+        case .syncNotConfigured:
+            return "It was built without iCloud, so your records live on this device only. Everything else works exactly as it should."
         case .storageFull:
             return "Free up some space, or remove a download you’re finished with."
         case .transferFailed:

@@ -9,6 +9,8 @@ public enum CloudAccountState: String, Sendable {
     case restricted
     case temporarilyUnavailable
     case unknown
+    /// This build carries no iCloud entitlement, so there is nothing to sign in to.
+    case notConfigured
 
     public var canSync: Bool { self == .available }
 
@@ -18,6 +20,7 @@ public enum CloudAccountState: String, Sendable {
         case .available: return nil
         case .signedOut: return DubplateError(.iCloudSignedOut)
         case .restricted, .temporarilyUnavailable, .unknown: return DubplateError(.iCloudUnavailable)
+        case .notConfigured: return DubplateError(.syncNotConfigured)
         }
     }
 }
@@ -31,6 +34,10 @@ public struct CloudAccount: Sendable {
     }
 
     public func state() async -> CloudAccountState {
+        // Asked before anything touches CloudKit. `CKSyncEngine` without the
+        // entitlement fails the same way the mirrored store does, on a queue of its
+        // own where nothing can catch it.
+        guard DubplateSchema.hasCloudKitEntitlement else { return .notConfigured }
         do {
             switch try await container.accountStatus() {
             case .available: return .available

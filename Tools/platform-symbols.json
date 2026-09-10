@@ -32,6 +32,7 @@
     "Observation",
     "PhotosUI",
     "QuartzCore",
+    "Security",
     "Swift",
     "SwiftData",
     "SwiftUI",
@@ -840,5 +841,11 @@
     "NWConnection",
     "NWEndpoint",
     "NWParameters"
+  ],
+  "security": [
+    "CFString",
+    "SecTask",
+    "SecTaskCopyValueForEntitlement",
+    "SecTaskCreateFromSelf"
   ]
 }
