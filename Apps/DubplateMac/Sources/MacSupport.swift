@@ -194,11 +194,17 @@ struct MacSettingsView: View {
                         Text(option.displayName).tag(option)
                     }
                 }
-                Picker("Default Preview", selection: $settings.defaultPreviewMode) {
+            }
+
+            Section("Preview") {
+                Picker("Opens in", selection: $settings.defaultPreviewMode) {
                     ForEach(PreviewMode.allCases) { mode in
                         Text(mode.displayName).tag(mode)
                     }
                 }
+                Text("Which way the iPhone preview starts. You can still swipe between all three.")
+                    .dubplateFont(DubplateType.metadata)
+                    .foregroundStyle(DubplateColor.tertiaryText)
             }
 
             Section("Storage") {

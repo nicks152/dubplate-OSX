@@ -172,12 +172,6 @@ public final class LibraryStore {
         release.applyOrder(ordered)
         save()
     }
-
-    public func setOrder(_ tracks: [Track], in release: Release) {
-        release.applyOrder(tracks)
-        save()
-    }
-
     // MARK: - Tracks
 
     @discardableResult
@@ -389,6 +383,4 @@ public struct ImportProgress: Equatable, Sendable {
     public var fraction: Double {
         total > 0 ? Double(completed) / Double(total) : 0
     }
-
-    public var isFinished: Bool { completed >= total }
 }

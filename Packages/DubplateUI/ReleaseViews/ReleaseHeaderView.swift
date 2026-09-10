@@ -138,6 +138,15 @@ public struct ReleaseHeaderView: View {
             Text(metadataLine)
                 .dubplateFont(DubplateType.metadata)
                 .foregroundStyle(DubplateColor.tertiaryText)
+
+            // The cover's dimensions are measured on import, and a soft one was
+            // being detected and never mentioned. Said once, where the cover can
+            // be replaced, and only when it is actually a problem.
+            if isEditable, let artwork = release.artwork, artwork.isLowResolution {
+                Text("Cover is \(artwork.pixelSummary) — soft on a phone at full width")
+                    .dubplateFont(DubplateType.metadata)
+                    .foregroundStyle(DubplateColor.tertiaryText)
+            }
         }
         .multilineTextAlignment(alignment == .center ? .center : .leading)
         .onChange(of: focusedField) { _, newValue in

@@ -254,7 +254,12 @@ public final class AppServices {
 
     /// Plays one loose track from the inbox.
     public func play(track: Track) {
-        guard let item = QueueBuilder.item(for: track) else { return }
+        guard let item = QueueBuilder.item(for: track) else {
+            // Its sibling above says so; a press that does nothing in silence is
+            // the failure round 3 wrote its standing test about.
+            announce("“\(track.displayTitle)” has no audio to play yet")
+            return
+        }
         player.play(item)
     }
 
@@ -287,12 +292,12 @@ public final class AppServices {
     /// Reports what a drop actually did. Silence after an import is what makes a
     /// re-dropped bounce indistinguishable from data loss.
     public func report(_ outcome: ImportOutcome, trackTitle: String? = nil) {
-        let summary = outcome.summary(trackTitle: trackTitle)
-        guard !summary.isEmpty, summary != "Nothing to add" || !outcome.failures.isEmpty else {
-            lastImportSummary = outcome.isEmpty ? "Nothing new in that drop" : summary
-            return
-        }
-        lastImportSummary = summary
+        // `summary` always returns something, and a drop that added nothing says
+        // so in its own words. The branches that used to be here compared against
+        // a copy string duplicated from another file and could never be reached.
+        lastImportSummary = outcome.isEmpty && outcome.failures.isEmpty
+            ? "Nothing new in that drop"
+            : outcome.summary(trackTitle: trackTitle)
     }
 
     /// One line, said once. Used for the small confirmations that should not be

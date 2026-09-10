@@ -58,11 +58,4 @@ public enum NetworkPath {
         if path.isExpensive || path.isConstrained { return true }
         return path.usesInterfaceType(.cellular)
     }
-
-    /// True when there is a measured path and it is unusable.
-    public static var isOffline: Bool {
-        start()
-        guard let path = state.current else { return false }
-        return path.status != .satisfied
-    }
 }

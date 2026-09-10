@@ -201,9 +201,14 @@ public struct Toast: View {
         .overlay(Capsule().strokeBorder(DubplateColor.hairline))
         .shadow(color: .black.opacity(0.2), radius: 16, y: 6)
         .task {
+            // Announced, not just drawn. This is the product's only channel for
+            // "here is what that drop did", and it comes and goes in six seconds —
+            // a VoiceOver user was never told at all.
+            AccessibilityNotification.Announcement(message).post()
             try? await Task.sleep(for: .seconds(6))
             onDismiss()
         }
         .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isStaticText)
     }
 }

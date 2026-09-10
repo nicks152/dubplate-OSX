@@ -365,11 +365,6 @@ public final class SyncCoordinator {
     private func fetchAudioAsset(_ id: UUID) -> AudioAsset? {
         try? context.fetch(FetchDescriptor<AudioAsset>(predicate: #Predicate { $0.id == id })).first
     }
-
-    private func fetchArtworkAsset(_ id: UUID) -> ArtworkAsset? {
-        try? context.fetch(FetchDescriptor<ArtworkAsset>(predicate: #Predicate { $0.id == id })).first
-    }
-
     private func save() {
         do {
             try context.save()

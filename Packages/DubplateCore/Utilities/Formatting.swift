@@ -34,13 +34,17 @@ public enum Formatting {
         return parts.joined(separator: " ")
     }
 
-    /// "1.2 GB", "480 MB".
+    /// "1.2 GB", "480 MB", "Nothing yet".
     public static func fileSize(_ bytes: Int64) -> String {
-        guard bytes > 0 else { return "Zero KB" }
+        // Not "Zero KB". A record whose sizes have not been recorded reads that
+        // line as a measurement, and it is not one.
+        guard bytes > 0 else { return "Nothing yet" }
         return bytes.formatted(.byteCount(style: .file))
     }
 
-    /// "2 hours ago", "Yesterday", "Monday" — used in the inbox and recently played.
+    /// "2 hours ago", "yesterday", "last week" — used in the inbox and recently
+    /// played. `RelativeDateTimeFormatter` names only the units it has names for,
+    /// so there is no weekday among them.
     public static func relativeDate(_ date: Date, now: Date = Date()) -> String {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .full

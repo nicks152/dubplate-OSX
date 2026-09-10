@@ -90,13 +90,6 @@ public enum DroppedFiles {
         }
         return Expansion(files: result, wasTruncated: truncated)
     }
-
-    /// True when the drop was of folders rather than loose files, which is worth
-    /// saying once in the import summary.
-    public static func containsDirectory(_ urls: [URL], fileManager: FileManager = .default) -> Bool {
-        urls.contains { isDirectory($0, fileManager: fileManager) && !isPackage($0) }
-    }
-
     /// Whether a drop is worth accepting, decided without walking it.
     ///
     /// A drop handler has to answer while Finder waits, and walking a dropped

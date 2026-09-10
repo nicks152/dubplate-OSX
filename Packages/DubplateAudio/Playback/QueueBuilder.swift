@@ -48,11 +48,6 @@ public enum QueueBuilder {
         )
     }
 
-    /// Every version of a track as its own queue item, for the version picker.
-    public static func versionItems(for track: Track) -> [PlaybackQueueItem] {
-        track.orderedVersions.compactMap { item(for: track, version: $0) }
-    }
-
     private static func displayArtist(for track: Track) -> String {
         let base = track.artistName.isEmpty ? (track.release?.artistName ?? "") : track.artistName
         guard let feature = track.featureLine else { return base }

@@ -49,11 +49,6 @@ public final class TrackVersion {
     public var isCurrent: Bool {
         track?.currentVersion?.id == id
     }
-
-    public var audioAssetID: UUID? {
-        audioAsset?.id
-    }
-
     /// "v5" — the short form used in dense lists.
     public var shortName: String {
         "v\(versionNumber)"

@@ -41,9 +41,12 @@ public struct TrackRow: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: DubplateLayout.s) {
+                    // Weight, not colour: `accent` and `primaryText` are the same
+                    // value by design — the accent is maximum contrast, not a hue —
+                    // so the ternary that used to be here could not do anything.
                     Text(track.displayTitle)
-                        .dubplateFont(DubplateType.rowTitle)
-                        .foregroundStyle(isCurrent ? DubplateColor.accent : DubplateColor.primaryText)
+                        .dubplateFont(isCurrent ? DubplateType.rowTitleCurrent : DubplateType.rowTitle)
+                        .foregroundStyle(DubplateColor.primaryText)
                         .lineLimit(1)
                     if track.explicitFlag {
                         ExplicitBadge()

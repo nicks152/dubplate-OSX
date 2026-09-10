@@ -13,6 +13,39 @@ enum LibrarySection: Hashable {
     case inbox
     case release(UUID)
 
+    /// A form that survives a relaunch. Deliberately not `Codable`: this is two
+    /// lines, and a release that has since been deleted has to fail to restore
+    /// rather than open an empty screen.
+    var storageValue: String {
+        switch self {
+        case .recentlyPlayed: return "recentlyPlayed"
+        case .albums: return "albums"
+        case .eps: return "eps"
+        case .singles: return "singles"
+        case .projects: return "projects"
+        case .inbox: return "inbox"
+        case .release(let id): return "release:\(id.uuidString)"
+        }
+    }
+
+    init?(storageValue: String) {
+        switch storageValue {
+        case "recentlyPlayed": self = .recentlyPlayed
+        case "albums": self = .albums
+        case "eps": self = .eps
+        case "singles": self = .singles
+        case "projects": self = .projects
+        case "inbox": self = .inbox
+        default:
+            guard storageValue.hasPrefix("release:"),
+                  let id = UUID(uuidString: String(storageValue.dropFirst("release:".count)))
+            else {
+                return nil
+            }
+            self = .release(id)
+        }
+    }
+
     var title: String {
         switch self {
         case .recentlyPlayed: return "Recently Played"
@@ -37,9 +70,14 @@ struct MacRootView: View {
     @Environment(LibraryStore.self) private var library
     @Environment(PlayerController.self) private var player
 
+    // Restored across launches, so the window comes back to the record that was
+    // open rather than always to Albums.
+    @SceneStorage("dubplate.section") private var storedSection: String = ""
     @State private var section: LibrarySection = .albums
     @State private var isShowingNewRelease = false
     @State private var isShowingStorageHelp = false
+    @State private var openedFiles: [URL] = []
+    @State private var openedFilesTask: Task<Void, Never>?
     @State private var searchText = ""
     @Environment(\.openWindow) private var openWindow
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
@@ -112,8 +150,31 @@ struct MacRootView: View {
         .onReceive(NotificationCenter.default.publisher(for: .dubplateTogglePreview)) { _ in
             openWindow(id: DubplateWindow.phonePreview)
         }
+        .onAppear {
+            if let restored = LibrarySection(storageValue: storedSection) {
+                section = restored
+            }
+        }
+        .onChange(of: section) { _, newValue in
+            storedSection = newValue.storageValue
+        }
         .onReceive(NotificationCenter.default.publisher(for: .dubplateShowStorageHelp)) { _ in
             isShowingStorageHelp = true
+        }
+        // Dubplate appears in Finder's Open With for every bounce on the machine.
+        // It used to appear there and then do nothing when chosen, which is worse
+        // than not appearing at all. One notification per file, so they are
+        // collected for a moment and imported as the single drop they are.
+        .onOpenURL { url in
+            openedFiles.append(url)
+            openedFilesTask?.cancel()
+            openedFilesTask = Task {
+                try? await Task.sleep(for: .milliseconds(250))
+                guard !Task.isCancelled else { return }
+                let batch = openedFiles
+                openedFiles.removeAll()
+                await importOpened(batch)
+            }
         }
         .alert("Where your bounces live", isPresented: $isShowingStorageHelp) {
             Button("Show in Finder") { RevealInFinder.reveal(services.mediaStore.root) }
@@ -190,6 +251,31 @@ struct MacRootView: View {
     private var currentArtwork: ArtworkAsset? {
         guard let releaseID = player.currentItem?.releaseID else { return nil }
         return library.release(id: releaseID)?.artwork
+    }
+
+    /// Files chosen in Finder go where a drop of the same files would: into the
+    /// release that is open, or into a new one named after their folder.
+    private func importOpened(_ urls: [URL]) async {
+        guard DroppedFiles.couldHoldMedia(urls) else { return }
+        let openRelease: Release? = {
+            guard case .release(let id) = section else { return nil }
+            return library.release(id: id)
+        }()
+
+        let plan = await library.plan(for: urls, in: openRelease)
+        guard !plan.isEmpty else {
+            services.announce("Nothing in that Dubplate can play")
+            return
+        }
+        let target = openRelease ?? library.createRelease(
+            title: DroppedFiles.releaseName(from: urls) ?? "",
+            artistName: library.defaultArtistName,
+            type: ReleaseType.inferred(fromTrackCount: plan.audioFileCount)
+        )
+        let outcome = await library.apply(plan, to: target)
+        services.report(outcome)
+        await services.registerNewMedia(in: target)
+        section = .release(target.id)
     }
 
     private func create(_ result: NewReleaseSheet.Result) async {

@@ -78,7 +78,10 @@ public struct TrackInspectorView: View {
                 }
                 VStack(alignment: .leading, spacing: DubplateLayout.xs) {
                     Text("Explicit").dubplateLabelStyle()
-                    Toggle("", isOn: $track.explicitFlag)
+                    // Labelled for VoiceOver even though the label is drawn above
+                    // it: `Toggle("")` reads as an unnamed switch, and the Text
+                    // beside it is a separate element that never gets associated.
+                    Toggle("Explicit", isOn: $track.explicitFlag)
                         .labelsHidden()
                         .toggleStyle(.switch)
                         .onChange(of: track.explicitFlag) { _, _ in onCommit() }

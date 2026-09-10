@@ -279,6 +279,7 @@
     "URLResourceValues"
   ],
   "swiftui": [
+    "AccessibilityNotification",
     "Alignment",
     "Angle",
     "AngularGradient",
@@ -441,6 +442,7 @@
     "ScenePadding",
     "ScenePhase",
     "ScenePhaseKey",
+    "SceneStorage",
     "ScrollBounceBehavior",
     "ScrollDismissesKeyboardMode",
     "ScrollPhase",

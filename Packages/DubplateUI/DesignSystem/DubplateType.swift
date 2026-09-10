@@ -87,6 +87,10 @@ public enum DubplateType {
     /// Track titles in a list.
     public static let rowTitle = DubplateFont(size: 14, relativeTo: .footnote)
 
+    /// The track that is playing. One step of weight, which is the only difference
+    /// available in a palette that has no second colour.
+    public static let rowTitleCurrent = DubplateFont(size: 14, weight: .medium, relativeTo: .footnote)
+
     /// Artist under a title.
     public static let rowSubtitle = DubplateFont(size: 13, relativeTo: .footnote)
 

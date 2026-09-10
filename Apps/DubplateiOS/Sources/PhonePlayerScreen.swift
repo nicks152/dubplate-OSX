@@ -75,7 +75,7 @@ struct PhonePlayerScreen: View {
     }
 }
 
-/// Settings on the phone: the same eight switches, in a list.
+/// Settings on the phone: the same five preferences, in a list.
 struct PhoneSettingsScreen: View {
     @Environment(AppServices.self) private var services
     @Environment(DubplateSettings.self) private var settings
@@ -128,7 +128,7 @@ struct PhoneSettingsScreen: View {
             }
 
             Section("Storage") {
-                LabeledContent("Music on this iPhone", value: Formatting.fileSize(storageUsed))
+                LabeledContent("Media on this iPhone", value: Formatting.fileSize(storageUsed))
             }
 
             Section {

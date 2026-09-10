@@ -54,7 +54,13 @@ public struct ArtworkView: View {
             }
         }
         .aspectRatio(1, contentMode: .fit)
-        .accessibilityLabel(image == nil ? "\(title), no artwork" : "\(title) artwork")
+        .accessibilityLabel(artworkDescription)
+    }
+
+    private var artworkDescription: String {
+        if image != nil { return "\(title) artwork" }
+        if loader.isUndecodable(asset) { return "\(title), artwork could not be read" }
+        return "\(title), no artwork"
     }
 
     private func radius(for edge: CGFloat) -> CGFloat {
@@ -202,5 +208,27 @@ public struct FileArtworkPreview: View {
         }.value
         image = loaded
         didFail = loaded == nil
+    }
+}
+
+/// Sits over the monogram when the cover file is present and will not decode.
+///
+/// Small and quiet: it is a fact about one file, not an error the whole screen
+/// needs to stop for. Replacing the cover clears it.
+struct UnreadableArtworkBadge: View {
+    var body: some View {
+        VStack {
+            Spacer()
+            Text("Cover unreadable")
+                .dubplateFont(DubplateType.label)
+                .textCase(.uppercase)
+                .kerning(1.1)
+                .foregroundStyle(DubplateColor.playerPrimaryText)
+                .padding(.horizontal, DubplateLayout.s)
+                .padding(.vertical, 3)
+                .background(.black.opacity(0.55), in: Capsule())
+                .padding(DubplateLayout.s)
+        }
+        .accessibilityHidden(true)
     }
 }

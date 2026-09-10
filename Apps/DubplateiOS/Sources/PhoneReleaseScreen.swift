@@ -158,7 +158,9 @@ struct DownloadButton: View {
         }
     }
 
-    private enum State: Equatable {
+    /// Named for what it describes rather than `State`, which shadows the property
+    /// wrapper inside a view that also uses it.
+    private enum DownloadState: Equatable {
         case downloaded
         case notDownloaded
         case partial
@@ -207,7 +209,7 @@ struct DownloadButton: View {
         services.downloadSize(of: release)
     }
 
-    private var downloadState: State {
+    private var downloadState: DownloadState {
         let states = assets.map(\.availability)
         guard !states.isEmpty else { return .notDownloaded }
         if states.allSatisfy({ $0.isPlayableNow }) {
@@ -217,7 +219,7 @@ struct DownloadButton: View {
         return .notDownloaded
     }
 
-    private func toggle(_ state: State) async {
+    private func toggle(_ state: DownloadState) async {
         isWorking = true
         defer { isWorking = false }
         switch state {

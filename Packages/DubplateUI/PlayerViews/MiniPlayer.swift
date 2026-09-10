@@ -57,6 +57,10 @@ public struct MiniPlayer: View {
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel("Now playing: \(item.title) by \(item.artistName)")
                 .accessibilityHint("Opens the player")
+                // The hint promised a way in and there was none: a tap gesture is
+                // not a button, so VoiceOver had nothing to activate.
+                .accessibilityAddTraits(.isButton)
+                .accessibilityAction(action: onOpen)
         }
     }
 

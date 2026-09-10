@@ -333,7 +333,10 @@ struct ReleaseDetailScreen: View {
             return
         }
         let audio = files.filter { FilenameParser.isAudio($0.lastPathComponent) }
-        guard !audio.isEmpty else { return }
+        guard !audio.isEmpty else {
+            services.announce("Nothing in that drop Dubplate can play")
+            return
+        }
 
         let match = VersionMatcher.match(
             filename: audio[0].lastPathComponent,

@@ -99,8 +99,4 @@ public final class ArtworkAsset {
     public var isLowResolution: Bool {
         kind == .staticArtwork && min(width, height) > 0 && min(width, height) < Self.recommendedMinimumEdge
     }
-
-    public var isSquare: Bool {
-        width > 0 && width == height
-    }
 }

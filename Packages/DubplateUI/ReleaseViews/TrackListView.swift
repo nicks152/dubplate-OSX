@@ -65,15 +65,13 @@ public struct TrackListView: View {
                 .listRowInsets(EdgeInsets(top: 2, leading: DubplateLayout.s, bottom: 2, trailing: DubplateLayout.s))
                 .listRowBackground(rowBackground(for: track))
                 .contentShape(Rectangle())
+                // Only the double tap. A single-tap gesture beside it duplicated
+                // the selection the List already does, and made every click wait
+                // out the double-click window before the row highlighted.
                 .onTapGesture(count: 2) { onPlay(track) }
-                .onTapGesture { selection = track.id }
                 .dropDestination(for: URL.self) { urls, _ in
-                    guard let onDropAudio else { return false }
-                    // Folders and every file in the drop, not just the first one.
-                    let audio = DroppedFiles.expand(urls)
-                        .filter { FilenameParser.isAudio($0.lastPathComponent) }
-                    guard !audio.isEmpty else { return false }
-                    onDropAudio(track, audio)
+                    guard let onDropAudio, DroppedFiles.couldHoldMedia(urls) else { return false }
+                    onDropAudio(track, urls)
                     return true
                 }
                 .contextMenu {

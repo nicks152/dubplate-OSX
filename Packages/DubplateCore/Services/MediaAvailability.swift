@@ -46,19 +46,4 @@ public enum MediaAvailability {
         let artwork = (try? context.fetch(FetchDescriptor<ArtworkAsset>())) ?? []
         for asset in artwork { refresh(asset, using: store) }
     }
-
-    /// The current versions of a release that are not on this device yet.
-    public static func missingAssetIDs(for release: Release, using store: MediaStore) -> [UUID] {
-        var identifiers: [UUID] = []
-        for track in release.orderedTracks {
-            guard let asset = track.currentAsset else { continue }
-            if !store.exists(relativePath: asset.relativePath) {
-                identifiers.append(asset.id)
-            }
-        }
-        if let artwork = release.artwork, !store.exists(relativePath: artwork.relativePath) {
-            identifiers.append(artwork.id)
-        }
-        return identifiers
-    }
 }

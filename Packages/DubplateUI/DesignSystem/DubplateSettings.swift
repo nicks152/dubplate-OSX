@@ -5,7 +5,7 @@ import DubplateCore
 
 /// Everything Dubplate lets you change.
 ///
-/// Eight switches. There is no settings application inside the application: if a
+/// Five of them. There is no settings application inside the application: if a
 /// preference cannot be defended as something a producer would actually want to
 /// change, it is a decision, not a setting.
 @MainActor

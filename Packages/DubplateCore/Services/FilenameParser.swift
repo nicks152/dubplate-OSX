@@ -360,13 +360,6 @@ public enum FilenameParser {
         if let split = splitLetterDigit(lower), weakTokens.contains(split.0) { return true }
         return false
     }
-
-    /// True when `extra` is only revision noise — used to decide whether two
-    /// similar filenames are the same song.
-    static func isOnlyWeakTokens(_ extra: [String]) -> Bool {
-        !extra.isEmpty && extra.count <= 3 && extra.allSatisfy { isWeak($0) || Int($0) != nil }
-    }
-
     private static func ordinal(in tokens: [String]) -> Int? {
         for token in tokens.reversed() {
             if let value = Int(token) { return value }
