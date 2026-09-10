@@ -118,9 +118,14 @@ public final class Release {
     /// Rewrites `trackOrder` from the given sequence and renumbers the tracks.
     public func applyOrder(_ ordered: [Track], at date: Date = Date()) {
         trackOrder = ordered.map(\.id.uuidString)
-        for (index, track) in ordered.enumerated() where track.trackNumber != index + 1 {
-            track.trackNumber = index + 1
-            track.updatedAt = date
+        var numberByDisc: [Int: Int] = [:]
+        for track in ordered {
+            let next = (numberByDisc[track.discNumber] ?? 0) + 1
+            numberByDisc[track.discNumber] = next
+            if track.trackNumber != next {
+                track.trackNumber = next
+                track.updatedAt = date
+            }
         }
         cachedDuration = ordered.reduce(0) { $0 + $1.duration }
         updatedAt = date

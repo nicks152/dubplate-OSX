@@ -54,8 +54,10 @@ public actor MediaIngestor {
             throw DubplateError(.importFailed, subject: source.lastPathComponent, underlying: error)
         }
 
+        // Hash the source, not the copy: they are byte-identical and reading a
+        // 300 MB master twice for the same answer is 300 MB of pointless I/O.
+        let checksum = (try? Checksum.signature(ofFileAt: source)) ?? ""
         let destination = store.url(forRelativePath: result.relativePath)
-        let checksum = (try? Checksum.signature(ofFileAt: destination)) ?? ""
 
         do {
             let info = try await inspector.inspect(fileAt: destination)
@@ -69,8 +71,9 @@ public actor MediaIngestor {
                 sourceFolder: source.deletingLastPathComponent().lastPathComponent
             )
         } catch {
-            // The bytes are safely stored; only reading them failed. Keep the file
-            // so the person can still see it and retry, but report the failure.
+            // Nothing can be done with a file the system cannot open, and leaving
+            // the bytes behind would leak storage for something no version points
+            // at. The original in the bounce folder is untouched either way.
             try? store.remove(relativePath: result.relativePath)
             throw DubplateError(.unreadableAudio, subject: source.lastPathComponent, underlying: error)
         }
@@ -82,13 +85,12 @@ public actor MediaIngestor {
         let assetID = UUID()
         do {
             let result = try store.ingest(contentsOf: source, area: .artwork, assetID: assetID)
-            let destination = store.url(forRelativePath: result.relativePath)
             return IngestedFile(
                 assetID: assetID,
                 relativePath: result.relativePath,
                 originalFilename: source.lastPathComponent,
                 fileSize: result.fileSize,
-                checksum: (try? Checksum.signature(ofFileAt: destination)) ?? "",
+                checksum: (try? Checksum.signature(ofFileAt: source)) ?? "",
                 info: AudioFileInfo()
             )
         } catch {

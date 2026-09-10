@@ -30,8 +30,13 @@ public enum Checksum {
 
         for offset in offsets {
             try handle.seek(toOffset: UInt64(offset))
-            if let chunk = try handle.read(upToCount: windowSize) {
+            // `read(upToCount:)` is allowed to return fewer bytes than asked for,
+            // and a short read part-way through a window would change the answer.
+            var remaining = windowSize
+            while remaining > 0 {
+                guard let chunk = try handle.read(upToCount: remaining), !chunk.isEmpty else { break }
                 hasher.update(data: chunk)
+                remaining -= chunk.count
             }
         }
         return digestString(hasher.finalize())

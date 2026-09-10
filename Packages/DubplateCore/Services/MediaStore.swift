@@ -112,9 +112,12 @@ public struct MediaStore: Sendable {
 
         try fileManager.copyItem(at: source, to: staging)
         if fileManager.fileExists(atPath: destination.path(percentEncoded: false)) {
-            try fileManager.removeItem(at: destination)
+            // One atomic swap rather than remove-then-move, which leaves a window
+            // where the asset exists in the database and not on disk.
+            _ = try fileManager.replaceItemAt(destination, withItemAt: staging)
+        } else {
+            try fileManager.moveItem(at: staging, to: destination)
         }
-        try fileManager.moveItem(at: staging, to: destination)
 
         let size = (try? Checksum.fileSize(of: destination)) ?? 0
         return (assetID, path, size)
@@ -128,9 +131,10 @@ public struct MediaStore: Sendable {
             withIntermediateDirectories: true
         )
         if fileManager.fileExists(atPath: destination.path(percentEncoded: false)) {
-            try fileManager.removeItem(at: destination)
+            _ = try fileManager.replaceItemAt(destination, withItemAt: temporaryFile)
+        } else {
+            try fileManager.moveItem(at: temporaryFile, to: destination)
         }
-        try fileManager.moveItem(at: temporaryFile, to: destination)
     }
 
     public func remove(relativePath path: String) throws {

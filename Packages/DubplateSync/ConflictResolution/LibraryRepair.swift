@@ -29,9 +29,16 @@ public enum LibraryRepair {
             changed = true
         }
 
-        for (index, track) in release.orderedTracks.enumerated() where track.trackNumber != index + 1 {
-            track.trackNumber = index + 1
-            changed = true
+        // Numbering restarts on each disc: renumbering 1…N straight through a
+        // two-disc record on every repair is worse than not renumbering at all.
+        var numberByDisc: [Int: Int] = [:]
+        for track in release.orderedTracks {
+            let next = (numberByDisc[track.discNumber] ?? 0) + 1
+            numberByDisc[track.discNumber] = next
+            if track.trackNumber != next {
+                track.trackNumber = next
+                changed = true
+            }
         }
 
         for track in tracks where repair(track) {
