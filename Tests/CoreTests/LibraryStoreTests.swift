@@ -145,6 +145,105 @@ final class LibraryStoreTests: XCTestCase {
         XCTAssertEqual(track.trackNumber, 1)
     }
 
+    /// The same master can appear on a single and on the album. It used to be
+    /// refused outright, which is indistinguishable from data loss.
+    func testTheSameMasterCanAppearOnTwoReleases() async throws {
+        let url = try makeAudioFile(named: "Midnight.wav")
+        let single = store.createRelease(title: "Midnight", artistName: "A", type: .single)
+        await store.apply(store.plan(for: [url], in: single), to: single)
+
+        let album = store.createRelease(title: "NO SIGNAL", artistName: "A", type: .album)
+        let outcome = await store.apply(store.plan(for: [url], in: album), to: album)
+
+        XCTAssertEqual(outcome.createdTracks.count, 1)
+        XCTAssertEqual(album.trackCount, 1)
+        XCTAssertTrue(outcome.duplicateFilenames.isEmpty)
+
+        // One file behind both, not two copies of the bytes.
+        let singleAsset = try XCTUnwrap(single.orderedTracks.first?.currentAsset)
+        let albumAsset = try XCTUnwrap(album.orderedTracks.first?.currentAsset)
+        XCTAssertEqual(singleAsset.id, albumAsset.id)
+        XCTAssertEqual(singleAsset.versions?.count, 2)
+    }
+
+    /// Deleting one of the two records must not silence the other.
+    func testDeletingOneReleaseKeepsMediaSharedWithAnother() async throws {
+        let url = try makeAudioFile(named: "Midnight.wav")
+        let single = store.createRelease(title: "Midnight", artistName: "A", type: .single)
+        await store.apply(store.plan(for: [url], in: single), to: single)
+        let album = store.createRelease(title: "NO SIGNAL", artistName: "A", type: .album)
+        await store.apply(store.plan(for: [url], in: album), to: album)
+        let path = try XCTUnwrap(album.orderedTracks.first?.currentAsset?.relativePath)
+
+        store.delete(release: single)
+
+        XCTAssertTrue(store.mediaStore.exists(relativePath: path))
+        XCTAssertNotNil(album.orderedTracks.first?.currentAsset)
+    }
+
+    /// The error copy promises "drop the bounce in again to restore it", so it has
+    /// to actually restore it.
+    func testRedroppingABounceRestoresAMissingFile() async throws {
+        let release = store.createRelease(title: "Single", artistName: "A", type: .single)
+        let url = try makeAudioFile(named: "Midnight.wav")
+        await store.apply(store.plan(for: [url], in: release), to: release)
+        let asset = try XCTUnwrap(release.orderedTracks.first?.currentAsset)
+        try store.mediaStore.remove(relativePath: asset.relativePath)
+        XCTAssertFalse(store.mediaStore.exists(relativePath: asset.relativePath))
+
+        let outcome = await store.apply(store.plan(for: [url], in: release), to: release)
+
+        XCTAssertEqual(outcome.repairedFilenames, ["Midnight.wav"])
+        XCTAssertTrue(store.mediaStore.exists(relativePath: asset.relativePath))
+        XCTAssertEqual(release.trackCount, 1, "a repair is not a new track")
+    }
+
+    /// An instrumental sits next to the vocal. It never replaces it.
+    func testAVariantIsAddedButDoesNotBecomeCurrent() async throws {
+        let release = store.createRelease(title: "Single", artistName: "A", type: .single)
+        await store.apply(store.plan(for: [try makeAudioFile(named: "Midnight mix 5.wav")], in: release), to: release)
+        let track = try XCTUnwrap(release.orderedTracks.first)
+        let vocal = try XCTUnwrap(track.currentVersion)
+
+        await store.apply(
+            choice: .addAsNewVersion,
+            url: try makeAudioFile(named: "Midnight instrumental.wav"),
+            to: track
+        )
+
+        XCTAssertEqual(track.versionCount, 2)
+        XCTAssertEqual(track.currentVersionID, vocal.id, "the vocal is still the mix")
+    }
+
+    /// Availability is answered by looking, not by a synced flag.
+    func testAvailabilityFollowsTheFileSystem() async throws {
+        let release = store.createRelease(title: "Single", artistName: "A", type: .single)
+        await store.apply(store.plan(for: [try makeAudioFile(named: "Midnight.wav")], in: release), to: release)
+        let asset = try XCTUnwrap(release.orderedTracks.first?.currentAsset)
+
+        MediaAvailability.refresh(release, using: store.mediaStore)
+        XCTAssertEqual(asset.availability, .available)
+
+        try store.mediaStore.remove(relativePath: asset.relativePath)
+        MediaAvailability.refresh(release, using: store.mediaStore)
+        XCTAssertEqual(asset.availability, .cloudOnly)
+        XCTAssertFalse(asset.availability.isPlayableNow)
+    }
+
+    /// Taking a track off a record is not the same as destroying it.
+    func testRemovingFromAReleaseKeepsEverything() async throws {
+        let release = store.createRelease(title: "EP", artistName: "A", type: .ep)
+        await store.apply(store.plan(for: [try makeAudioFile(named: "01 A.wav")], in: release), to: release)
+        let track = try XCTUnwrap(release.orderedTracks.first)
+        let path = try XCTUnwrap(track.currentAsset?.relativePath)
+
+        store.removeFromRelease(track: track)
+
+        XCTAssertEqual(release.trackCount, 0)
+        XCTAssertEqual(store.inboxTracks().map(\.id), [track.id])
+        XCTAssertTrue(store.mediaStore.exists(relativePath: path))
+    }
+
     func testDeletingAReleaseRemovesItsTracks() async throws {
         let release = store.createRelease(title: "Gone", artistName: "A", type: .album)
         await store.apply(store.plan(for: [try makeAudioFile(named: "01 A.wav")], in: release), to: release)
