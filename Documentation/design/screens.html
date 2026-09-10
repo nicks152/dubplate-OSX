@@ -187,7 +187,7 @@ const mini = (t, a) => `
 screen('mac-library', 'Mac · Library', 'mac', `
 ${sidebar('Albums')}
 <div class="detail">
-  <div class="toolbar"><span class="meta">Syncing</span><span class="meta">◻ Phone Preview</span></div>
+  <div class="toolbar"><span class="meta">Syncing</span><span class="meta">◻ iPhone</span></div>
   <div style="padding:32px;overflow:hidden;flex:1">
     <div class="display-30" style="margin-bottom:24px">Albums</div>
     <div class="grid">
@@ -202,7 +202,7 @@ ${sidebar('Albums')}
 screen('mac-release', 'Mac · Release', 'mac', `
 ${sidebar('Albums')}
 <div class="detail">
-  <div class="toolbar"><span class="meta"></span><span class="meta">◻ Phone Preview</span></div>
+  <div class="toolbar"><span class="meta"></span><span class="meta">◻ iPhone</span></div>
   <div style="display:flex;flex:1;min-height:0">
     <div style="flex:1;display:flex;flex-direction:column;min-width:0">
       <div style="padding:32px;display:flex;gap:24px;align-items:flex-end">
@@ -232,15 +232,15 @@ ${sidebar('Albums')}
     <div class="inspector">
       <div class="field"><span class="label">Title</span><div class="box">Midnight</div></div>
       <div class="field"><span class="label">Artist</span><div class="box">Nick Loder</div></div>
-      <div class="field"><span class="label">Featured</span><div class="box" style="color:var(--tertiary)">Nobody</div></div>
-      <div style="display:flex;gap:16px">
-        <div class="field"><span class="label">Track</span><div class="box" style="width:48px">6</div></div>
-        <div class="field"><span class="label">Disc</span><div class="box" style="width:48px">1</div></div>
+      <div class="field"><span class="label">Featured</span><div class="box" style="color:var(--tertiary)">Nobody else on it</div></div>
+      <div style="display:flex;gap:24px;align-items:flex-start">
+        <div class="field"><span class="label">Track</span><div class="meta" style="color:var(--secondary);padding-top:4px">6 of 10</div></div>
+        <div class="field"><span class="label">Explicit</span><div class="meta" style="color:var(--tertiary);padding-top:4px">◯——</div></div>
       </div>
       <div class="rule"></div>
-      <div><div class="label" style="margin-bottom:8px">Current Version</div>
+      <div><div class="label" style="margin-bottom:8px">Current Mix</div>
         <div class="row-title">v5 — 06 Midnight mix 5.wav</div>
-        <div class="meta" style="margin-top:2px">4 versions</div></div>
+        <div class="meta" style="margin-top:2px">4 mixes · yesterday</div></div>
       <div class="rule"></div>
       <div><div class="label" style="margin-bottom:8px">File</div>
         <div class="meta" style="color:var(--secondary)">06 Midnight mix 5.wav</div>
@@ -251,8 +251,8 @@ ${sidebar('Albums')}
   ${mini('Midnight','Nick Loder')}
 </div>`);
 
-/* 3. Mac versions — a pane of the inspector, so the transport stays reachable */
-const versionRow = (n, l, d, src, current) => `
+/* 3. Mac mixes — a pane of the inspector, so the transport stays reachable */
+const mixRow = (n, l, d, src, current) => `
   <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border-radius:8px;
               ${current ? 'background:var(--sunken)' : ''}">
     <span style="width:20px;text-align:center;color:${current ? 'var(--primary)' : 'var(--secondary)'};font-size:11px">▶</span>
@@ -287,13 +287,13 @@ ${sidebar('Albums')}
       <div class="rule"></div>
       <div style="padding:16px;display:flex;flex-direction:column;gap:16px">
         <div><div class="label" style="margin-bottom:6px">Current</div>
-          ${versionRow('v5','Mix 5','Yesterday · 3:42 · 24-bit / 48 kHz · -10.8 LUFS','NO SIGNAL Bounces/06 Midnight mix 5.wav', true)}</div>
+          ${mixRow('v5','Mix 5','yesterday · 3:42 · 24-bit / 48 kHz · -10.8 LUFS','NO SIGNAL Bounces/06 Midnight mix 5.wav', true)}</div>
         <div><div class="label" style="margin-bottom:6px">Previous</div>
-          ${versionRow('v4','Mix 4','3 days ago · 3:41 · 24-bit / 48 kHz','NO SIGNAL Bounces/06 Midnight mix 4.wav', false)}
+          ${mixRow('v4','Mix 4','3 days ago · 3:41 · 24-bit / 48 kHz','NO SIGNAL Bounces/06 Midnight mix 4.wav', false)}
           <div class="rule" style="margin:2px 10px"></div>
-          ${versionRow('v3','Mix 3','last week · 3:44 · 24-bit / 48 kHz','NO SIGNAL Bounces/06 Midnight mix 3.wav', false)}
+          ${mixRow('v3','Mix 3','last week · 3:44 · 24-bit / 48 kHz','NO SIGNAL Bounces/06 Midnight mix 3.wav', false)}
           <div class="rule" style="margin:2px 10px"></div>
-          ${versionRow('v2','Rough','2 weeks ago · 3:52 · 24-bit / 44.1 kHz','Ideas/midnight rough.wav', false)}</div>
+          ${mixRow('v2','Rough','2 weeks ago · 3:52 · 24-bit / 44.1 kHz','Ideas/midnight rough.wav', false)}</div>
       </div>
     </div>
   </div>
@@ -367,7 +367,7 @@ screen('phone-release', 'iPhone · Release', 'phone', `
     ${NO_SIGNAL.slice(0,6).map((t,i) => `<div style="display:flex;align-items:center;gap:12px;height:56px;border-bottom:1px solid var(--hairline)">
       <span class="num" style="width:26px">${i===5?'<span class="bars"><i style="height:4px"></i><i style="height:10px"></i><i style="height:6px"></i></span>':(i+1)}</span>
       <span class="name" style="flex:1;font-size:14px;${i===5?'color:var(--primary)':''}">${t}</span>
-      ${i===5?'<span class="pill">4 mixes</span><span style="color:var(--tertiary);width:32px;text-align:center">⋯</span><span style="color:var(--tertiary);padding:0 8px">⋯</span>':''}
+      ${i===5?'<span class="pill">4 mixes</span><span style="color:var(--tertiary);width:32px;text-align:center">⋯</span>':''}
       <span class="dur">${DURS[i]}</span></div>`).join('')}
   </div>
 </div>`);
