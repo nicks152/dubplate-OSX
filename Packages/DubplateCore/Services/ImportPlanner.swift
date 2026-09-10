@@ -20,10 +20,14 @@ public struct PlannedVersion: Identifiable, Hashable, Sendable {
     public let id = UUID()
     public var candidate: ImportCandidate
     public var match: VersionMatch
+    /// Set on an uncertain match: the new track this bounce will become unless the
+    /// person says it is a mix of the track Dubplate half-recognised.
+    public var fallbackTrackID: UUID?
 
-    public init(candidate: ImportCandidate, match: VersionMatch) {
+    public init(candidate: ImportCandidate, match: VersionMatch, fallbackTrackID: UUID? = nil) {
         self.candidate = candidate
         self.match = match
+        self.fallbackTrackID = fallbackTrackID
     }
 }
 
@@ -42,6 +46,10 @@ public struct RejectedFile: Identifiable, Hashable, Sendable {
 public struct ImportPlan: Sendable {
     public var newTracks: [PlannedTrack] = []
     public var newVersions: [PlannedVersion] = []
+    /// Bounces that look like they might belong to a track already on the record,
+    /// but not confidently enough to act on. They are planned as new tracks; the
+    /// confirmation sheet offers to make them mixes instead.
+    public var uncertainVersions: [PlannedVersion] = []
     public var artwork: [ImportCandidate] = []
     public var motion: [ImportCandidate] = []
     public var rejected: [RejectedFile] = []
@@ -62,7 +70,10 @@ public struct ImportPlan: Sendable {
             parts.append("\(newTracks.count) track\(newTracks.count == 1 ? "" : "s")")
         }
         if !newVersions.isEmpty {
-            parts.append("\(newVersions.count) new version\(newVersions.count == 1 ? "" : "s")")
+            parts.append("\(newVersions.count) new mix\(newVersions.count == 1 ? "" : "es")")
+        }
+        if !uncertainVersions.isEmpty {
+            parts.append("\(uncertainVersions.count) to check")
         }
         if !artwork.isEmpty { parts.append("cover") }
         if !motion.isEmpty { parts.append("motion") }
@@ -109,11 +120,13 @@ public enum ImportPlanner {
 
         // Split into bounces of tracks we already have and genuinely new material.
         var unmatched: [ImportCandidate] = []
+        var uncertain: [UUID: VersionMatch] = [:]
         for candidate in audio {
-            if let match = VersionMatcher.match(filename: candidate.filename, among: existingTracks),
-               match.isConfident {
+            let match = VersionMatcher.match(filename: candidate.filename, among: existingTracks)
+            if let match, match.isConfident {
                 plan.newVersions.append(PlannedVersion(candidate: candidate, match: match))
             } else {
+                if let match { uncertain[candidate.id] = match }
                 unmatched.append(candidate)
             }
         }
@@ -132,9 +145,15 @@ public enum ImportPlanner {
             guard let members = groups[key] else { continue }
             let ordered = TrackOrdering.orderVersions(members)
             let title = ordered.first?.parsed.title ?? "Untitled"
-            plan.newTracks.append(
-                PlannedTrack(title: title, trackNumber: number, candidates: ordered)
-            )
+            let planned = PlannedTrack(title: title, trackNumber: number, candidates: ordered)
+            plan.newTracks.append(planned)
+            for candidate in ordered {
+                if let match = uncertain[candidate.id] {
+                    plan.uncertainVersions.append(
+                        PlannedVersion(candidate: candidate, match: match, fallbackTrackID: planned.id)
+                    )
+                }
+            }
             number += 1
         }
         return plan

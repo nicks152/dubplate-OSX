@@ -58,6 +58,25 @@ final class ImportPlannerTests: XCTestCase {
         XCTAssertEqual(plan.newTracks.first?.trackNumber, 5)
     }
 
+    /// A match Dubplate is only half-sure about used to become a duplicate track
+    /// with nothing said about it.
+    func testAnUncertainMatchIsOfferedRatherThanAssumed() {
+        let existing = [
+            TrackSummary(id: UUID(), title: "Untitled Two", trackNumber: 4, matchKeys: ["untitledtwo"])
+        ]
+        let plan = ImportPlanner.plan(
+            candidates: candidates(["04 Untitled.wav"]),
+            existingTracks: existing,
+            nextTrackNumber: 11
+        )
+
+        XCTAssertEqual(plan.uncertainVersions.count, 1)
+        XCTAssertTrue(plan.newVersions.isEmpty, "nothing uncertain is acted on")
+        XCTAssertEqual(plan.newTracks.count, 1, "the default is still a new track")
+        XCTAssertEqual(plan.uncertainVersions.first?.fallbackTrackID, plan.newTracks.first?.id)
+        XCTAssertTrue(plan.summary.contains("1 to check"))
+    }
+
     func testArtworkAndVideoAreSeparated() {
         let plan = ImportPlanner.plan(
             candidates: candidates(["01 Intro.wav", "cover.jpg", "loop.mov", "session.logicx"])
@@ -80,7 +99,7 @@ final class ImportPlannerTests: XCTestCase {
             candidates: candidates(["Midnight Mix 6.wav", "After Dark.wav", "cover.png"]),
             existingTracks: existing
         )
-        XCTAssertEqual(plan.summary, "1 track · 1 new version · cover")
+        XCTAssertEqual(plan.summary, "1 track · 1 new mix · cover")
     }
 
     /// Numbers that collide are not numbers worth trusting.

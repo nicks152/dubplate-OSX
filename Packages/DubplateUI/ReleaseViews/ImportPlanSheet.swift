@@ -27,9 +27,12 @@ public struct ImportPlanSheet: View {
         self.onConfirm = onConfirm
     }
 
+    /// Version matches the person has chosen to accept after all.
+    @State private var promoted: Set<UUID> = []
+
     /// A plan only needs confirming when Dubplate has guessed at something.
     public static func requiresConfirmation(_ plan: ImportPlan) -> Bool {
-        !plan.newVersions.isEmpty || !plan.rejected.isEmpty
+        !plan.newVersions.isEmpty || !plan.uncertainVersions.isEmpty || !plan.rejected.isEmpty
     }
 
     public var body: some View {
@@ -53,10 +56,18 @@ public struct ImportPlanSheet: View {
                             }
                         }
                     }
-                    if !plan.newTracks.isEmpty {
+                    if !plan.uncertainVersions.isEmpty {
+                        VStack(alignment: .leading, spacing: DubplateLayout.s) {
+                            SectionHeader("Not sure about these")
+                            ForEach(plan.uncertainVersions) { planned in
+                                uncertainRow(planned)
+                            }
+                        }
+                    }
+                    if !visibleNewTracks.isEmpty {
                         VStack(alignment: .leading, spacing: DubplateLayout.s) {
                             SectionHeader("New tracks")
-                            ForEach(plan.newTracks) { planned in
+                            ForEach(visibleNewTracks) { planned in
                                 HStack(spacing: DubplateLayout.m) {
                                     Text("\(planned.trackNumber)")
                                         .font(DubplateType.metadata)
@@ -138,6 +149,44 @@ public struct ImportPlanSheet: View {
         .padding(.vertical, DubplateLayout.xs)
     }
 
+    /// The uncertain band: offered, never assumed.
+    private func uncertainRow(_ planned: PlannedVersion) -> some View {
+        let isPromoted = promoted.contains(planned.id)
+        return HStack(alignment: .top, spacing: DubplateLayout.m) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(planned.candidate.filename)
+                    .font(DubplateType.rowTitle)
+                    .foregroundStyle(DubplateColor.primaryText)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Text(isPromoted
+                     ? "Will be a new mix of \(planned.match.trackTitle)"
+                     : "Might be \(planned.match.trackTitle) — \(planned.match.reason.lowercased()). Adding as a new track.")
+                    .font(DubplateType.metadata)
+                    .foregroundStyle(DubplateColor.tertiaryText)
+            }
+            Spacer(minLength: DubplateLayout.s)
+            Button(isPromoted ? "New Track Instead" : "Mix of \(planned.match.trackTitle)") {
+                if isPromoted {
+                    promoted.remove(planned.id)
+                } else {
+                    promoted.insert(planned.id)
+                }
+            }
+            .buttonStyle(DubplateQuietButtonStyle())
+            .controlSize(.small)
+        }
+        .padding(.vertical, DubplateLayout.xs)
+    }
+
+    /// New tracks that have not been promoted into mixes of an existing track.
+    private var visibleNewTracks: [PlannedTrack] {
+        let promotedTrackIDs = Set(
+            plan.uncertainVersions.filter { promoted.contains($0.id) }.compactMap(\.fallbackTrackID)
+        )
+        return plan.newTracks.filter { !promotedTrackIDs.contains($0.id) }
+    }
+
     private var orderingNote: String {
         switch plan.orderingSignal {
         case .filenameNumbers: return "Ordered by the numbers in the filenames"
@@ -148,11 +197,21 @@ public struct ImportPlanSheet: View {
 
     /// Applies the person's overrides to produce the plan that will actually run.
     private var resolvedPlan: ImportPlan {
-        guard !demoted.isEmpty else { return plan }
         var updated = plan
-        var nextNumber = (plan.newTracks.map(\.trackNumber).max() ?? 0) + 1
+
+        // Anything the person accepted becomes a mix, and stops being a new track.
+        if !promoted.isEmpty {
+            let accepted = plan.uncertainVersions.filter { promoted.contains($0.id) }
+            updated.newVersions.append(contentsOf: accepted)
+            let removedTrackIDs = Set(accepted.compactMap(\.fallbackTrackID))
+            updated.newTracks.removeAll { removedTrackIDs.contains($0.id) }
+        }
+        updated.uncertainVersions = []
+
+        guard !demoted.isEmpty else { return updated }
+        var nextNumber = (updated.newTracks.map(\.trackNumber).max() ?? 0) + 1
         var keptVersions: [PlannedVersion] = []
-        for planned in plan.newVersions {
+        for planned in updated.newVersions {
             if demoted.contains(planned.id) {
                 updated.newTracks.append(
                     PlannedTrack(
