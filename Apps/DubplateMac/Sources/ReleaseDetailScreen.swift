@@ -55,7 +55,9 @@ struct ReleaseDetailScreen: View {
         .background(DubplateColor.ground)
         .onAppear { services.open(release: release) }
         .dropDestination(for: URL.self) { urls, _ in
-            handleDrop(urls)
+            guard DroppedFiles.couldHoldMedia(urls) else { return false }
+            Task { await handleDrop(urls) }
+            return true
         } isTargeted: { isTargeted = $0 }
         .overlay {
             if isTargeted {
@@ -146,7 +148,7 @@ struct ReleaseDetailScreen: View {
             allowsMultipleSelection: true
         ) { result in
             if case .success(let urls) = result {
-                _ = handleDrop(urls)
+                Task { await handleDrop(urls) }
             }
         }
         .fileImporter(
@@ -201,7 +203,7 @@ struct ReleaseDetailScreen: View {
                     onMove: { offsets, destination in
                         library.move(in: release, fromOffsets: offsets, toOffset: destination)
                     },
-                    onDropAudio: { track, urls in receiveDrop(urls, on: track) },
+                    onDropAudio: { track, urls in Task { await receiveDrop(urls, on: track) } },
                     onShowVersions: { track in
                         selectedTrackID = track.id
                         inspector = .versions
@@ -322,14 +324,12 @@ struct ReleaseDetailScreen: View {
 
     // MARK: - Drops
 
-    private func receiveDrop(_ urls: [URL], on track: Track) {
-        let files = DroppedFiles.expand(urls)
+    private func receiveDrop(_ urls: [URL], on track: Track) async {
+        let files = await DroppedFiles.expandedOffActor(urls).files
         if let video = files.first(where: { FilenameParser.isVideo($0.lastPathComponent) }) {
             // A vertical loop dropped on a track is that track's canvas.
-            Task {
-                await library.setCanvas(from: video, for: track)
-                await services.registerNewMedia(in: release)
-            }
+            await library.setCanvas(from: video, for: track)
+            await services.registerNewMedia(in: release)
             return
         }
         let audio = files.filter { FilenameParser.isAudio($0.lastPathComponent) }
@@ -347,43 +347,40 @@ struct ReleaseDetailScreen: View {
         // current, and play it — the sheet is for the ambiguous case.
         let isObvious = audio.count == 1 && (match?.trackID == track.id || match == nil)
         if isObvious {
-            Task { await applyDrop(choice: .addAsNewVersion, urls: audio, track: track, startsPlaying: false) }
+            await applyDrop(choice: .addAsNewVersion, urls: audio, track: track, startsPlaying: false)
         } else {
             pendingDrop = PendingTrackDrop(track: track, urls: audio, match: match)
         }
     }
 
-    private func handleDrop(_ urls: [URL]) -> Bool {
-        let files = DroppedFiles.expand(urls)
+    private func handleDrop(_ urls: [URL]) async {
+        let files = await DroppedFiles.expandedOffActor(urls).files
         let images = files.filter { FilenameParser.isImage($0.lastPathComponent) }
         let audio = files.filter { FilenameParser.isAudio($0.lastPathComponent) }
         let videos = files.filter { FilenameParser.isVideo($0.lastPathComponent) }
-        guard !images.isEmpty || !audio.isEmpty || !videos.isEmpty else { return false }
+        guard !images.isEmpty || !audio.isEmpty || !videos.isEmpty else {
+            services.announce("Nothing in that drop Dubplate can use")
+            return
+        }
 
         if let image = images.first {
             if release.artwork == nil {
                 // Nothing can be lost, and this is the moment a folder becomes a
                 // record. It should not be answered with a dialog about a filename.
-                Task { await setArtwork(image, announcing: "Cover set") }
+                await setArtwork(image, announcing: "Cover set")
             } else {
                 // Replacing deletes the old file, so that one asks.
                 pendingArtwork = image
             }
         }
         if !audio.isEmpty || !videos.isEmpty {
-            // Planning walks the drop and matches every bounce against the record,
-            // so it happens off the main actor and the sheet appears when it is
-            // ready. A drop handler has to answer immediately either way.
-            Task {
-                let plan = await library.plan(for: audio + videos, in: release)
-                if ImportPlanSheet.requiresConfirmation(plan) {
-                    pendingPlan = IdentifiedPlan(plan)
-                } else {
-                    await apply(plan)
-                }
+            let plan = await library.plan(for: audio + videos, in: release)
+            if ImportPlanSheet.requiresConfirmation(plan) {
+                pendingPlan = IdentifiedPlan(plan)
+            } else {
+                await apply(plan)
             }
         }
-        return true
     }
 
     private func apply(_ plan: ImportPlan) async {

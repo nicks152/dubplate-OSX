@@ -137,11 +137,11 @@ public struct NewReleaseSheet: View {
             }
         }
         .dropDestination(for: URL.self) { urls, _ in
-            let files = DroppedFiles.expand(urls)
-            guard let match = files.first(where: { FilenameParser.isImage($0.lastPathComponent) }) else {
-                return false
+            guard DroppedFiles.couldHoldMedia(urls) else { return false }
+            Task {
+                let files = await DroppedFiles.expandedOffActor(urls).files
+                artworkURL = files.first { FilenameParser.isImage($0.lastPathComponent) } ?? artworkURL
             }
-            artworkURL = match
             return true
         } isTargeted: { isTargetedForArtwork = $0 }
     }
@@ -158,25 +158,30 @@ public struct NewReleaseSheet: View {
             EmptyView()
         }
         .dropDestination(for: URL.self) { urls, _ in
-            let files = DroppedFiles.expand(urls)
-            let audio = files.filter { FilenameParser.isAudio($0.lastPathComponent) }
-            // One well that routes by type, so a folder containing the bounces and
-            // the cover is a single drag.
-            if artworkURL == nil {
-                artworkURL = files.first { FilenameParser.isImage($0.lastPathComponent) }
-            }
-            guard !audio.isEmpty else { return artworkURL != nil }
-            audioURLs.append(contentsOf: audio)
-            if title.trimmingCharacters(in: .whitespaces).isEmpty,
-               let first = audio.first {
-                // A folder of bounces usually knows what the record is called.
-                title = first.deletingLastPathComponent().lastPathComponent
-            }
-            if !typeWasChosen {
-                type = ReleaseType.inferred(fromTrackCount: audioURLs.count)
-            }
+            guard DroppedFiles.couldHoldMedia(urls) else { return false }
+            Task { await receive(urls) }
             return true
         } isTargeted: { isTargetedForAudio = $0 }
+    }
+
+    /// One well that routes by type, so a folder holding the bounces and the cover
+    /// is a single drag.
+    private func receive(_ urls: [URL]) async {
+        let files = await DroppedFiles.expandedOffActor(urls).files
+        let audio = files.filter { FilenameParser.isAudio($0.lastPathComponent) }
+        if artworkURL == nil {
+            artworkURL = files.first { FilenameParser.isImage($0.lastPathComponent) }
+        }
+        guard !audio.isEmpty else { return }
+        audioURLs.append(contentsOf: audio)
+        if title.trimmingCharacters(in: .whitespaces).isEmpty {
+            // A dropped folder usually knows what the record is called. Loose files
+            // do not, and the folder they happen to sit in is called "Desktop".
+            title = DroppedFiles.releaseName(from: urls) ?? title
+        }
+        if !typeWasChosen {
+            type = ReleaseType.inferred(fromTrackCount: audioURLs.count)
+        }
     }
 }
 

@@ -43,6 +43,21 @@ public enum DroppedFiles {
         expanded(urls, depth: depth, limit: limit, fileManager: fileManager).files
     }
 
+    /// Files worth importing, off the main actor.
+    ///
+    /// The walk is one file-system call per entry, and a drop handler runs where a
+    /// window is waiting to draw. Handlers accept with `couldHoldMedia`, which
+    /// answers without looking, and then await this.
+    public static func expandedOffActor(
+        _ urls: [URL],
+        depth: Int = 2,
+        limit: Int = perDropLimit
+    ) async -> Expansion {
+        await Task.detached(priority: .userInitiated) {
+            expanded(urls, depth: depth, limit: limit)
+        }.value
+    }
+
     /// Files worth importing, and whether the walk had to stop early.
     ///
     /// - Parameter depth: how far to walk into folders. Two levels covers
