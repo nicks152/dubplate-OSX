@@ -21,7 +21,7 @@ public enum SyncStatus: String, Sendable {
         case .synced: return "Synced"
         case .syncing: return "Syncing"
         case .waiting: return "Waiting"
-        case .availableOnOtherDevice: return "Available on your Mac"
+        case .availableOnOtherDevice: return AvailabilityState.elsewhereDescription
         case .downloading: return "Downloading"
         case .offline: return "Offline"
         }

@@ -71,7 +71,7 @@ public struct DubplateError: LocalizedError, Identifiable, Sendable {
         case .fileMissing:
             return "It may have been moved or deleted outside Dubplate. Drop the bounce in again to restore it."
         case .notDownloadedYet:
-            return "It’ll play as soon as it arrives. You can keep listening to everything else in the meantime."
+            return "Dubplate couldn’t fetch it just now. Check your connection, or download the release to keep it on this device."
         case .iCloudUnavailable:
             return "Your work is saved on this device and will sync when iCloud comes back."
         case .iCloudSignedOut:

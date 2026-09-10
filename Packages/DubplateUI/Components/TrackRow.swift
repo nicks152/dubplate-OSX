@@ -211,7 +211,7 @@ public struct AvailabilityBadge: View {
             Image(systemName: "arrow.down.circle")
                 .font(.system(size: 12))
                 .foregroundStyle(DubplateColor.tertiaryText)
-                .accessibilityLabel("Available on your Mac")
+                .accessibilityLabel(AvailabilityState.elsewhereDescription)
         case .missing, .error:
             Image(systemName: "exclamationmark.circle")
                 .font(.system(size: 12))

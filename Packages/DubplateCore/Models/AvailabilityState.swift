@@ -23,13 +23,24 @@ public enum AvailabilityState: String, CaseIterable, Codable, Sendable {
         self == .local || self == .available
     }
 
+    /// Where a file that is not here is, phrased for the device asking.
+    ///
+    /// A phone says the record is on the Mac; a Mac cannot, because it is the Mac.
+    public static var elsewhereDescription: String {
+        #if os(iOS)
+        return "Available on your Mac"
+        #else
+        return "Available on your other device"
+        #endif
+    }
+
     /// Copy shown next to a track when it cannot be played. `nil` means "say nothing".
     public var listenerExplanation: String? {
         switch self {
         case .local, .available:
             return nil
         case .cloudOnly:
-            return "Available on your Mac"
+            return Self.elsewhereDescription
         case .downloading:
             return "Downloading"
         case .missing:

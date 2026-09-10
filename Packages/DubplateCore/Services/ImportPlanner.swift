@@ -75,8 +75,8 @@ public struct ImportPlan: Sendable {
         if !uncertainVersions.isEmpty {
             parts.append("\(uncertainVersions.count) to check")
         }
-        if !artwork.isEmpty { parts.append("cover") }
-        if !motion.isEmpty { parts.append("motion") }
+        if !artwork.isEmpty { parts.append("artwork") }
+        if !motion.isEmpty { parts.append("a looping visual") }
         if !rejected.isEmpty {
             parts.append("\(rejected.count) skipped")
         }
@@ -109,7 +109,7 @@ public enum ImportPlanner {
                 plan.rejected.append(
                     RejectedFile(
                         filename: candidate.filename,
-                        reason: "Dubplate doesn’t recognise this kind of file"
+                        reason: "Dubplate plays WAV, AIFF, CAF, FLAC, ALAC, AAC, M4A and MP3"
                     )
                 )
             }

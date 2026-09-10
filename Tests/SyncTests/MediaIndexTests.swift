@@ -126,7 +126,7 @@ final class MediaIndexTests: XCTestCase {
     func testSyncStatusCopy() {
         XCTAssertFalse(SyncStatus.synced.isWorthMentioning)
         XCTAssertTrue(SyncStatus.downloading.isWorthMentioning)
-        XCTAssertEqual(SyncStatus.availableOnOtherDevice.label, "Available on your Mac")
+        XCTAssertEqual(SyncStatus.availableOnOtherDevice.label, AvailabilityState.elsewhereDescription)
         XCTAssertNil(CloudAccountState.available.explanation)
         XCTAssertEqual(CloudAccountState.signedOut.explanation?.kind, .iCloudSignedOut)
     }

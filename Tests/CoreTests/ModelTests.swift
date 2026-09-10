@@ -115,7 +115,10 @@ final class ModelTests: XCTestCase {
     func testAvailabilityCopy() {
         XCTAssertNil(AvailabilityState.available.listenerExplanation)
         XCTAssertNil(AvailabilityState.local.listenerExplanation)
-        XCTAssertEqual(AvailabilityState.cloudOnly.listenerExplanation, "Available on your Mac")
+        XCTAssertEqual(
+            AvailabilityState.cloudOnly.listenerExplanation,
+            AvailabilityState.elsewhereDescription
+        )
         XCTAssertFalse(AvailabilityState.missing.isPlayableNow)
     }
 

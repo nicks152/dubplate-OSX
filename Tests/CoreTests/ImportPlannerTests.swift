@@ -99,7 +99,7 @@ final class ImportPlannerTests: XCTestCase {
             candidates: candidates(["Midnight Mix 6.wav", "After Dark.wav", "cover.png"]),
             existingTracks: existing
         )
-        XCTAssertEqual(plan.summary, "1 track · 1 new mix · cover")
+        XCTAssertEqual(plan.summary, "1 track · 1 new mix · artwork")
     }
 
     /// Numbers that collide are not numbers worth trusting.
