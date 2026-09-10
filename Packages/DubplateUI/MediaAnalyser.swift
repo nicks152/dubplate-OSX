@@ -49,8 +49,11 @@ public final class MediaAnalyser {
         // ternary between two of them expands to two large macro bodies inside one
         // expression, and the type-checker gives up rather than solving it — which
         // then cascades into every line that touches the descriptor.
+        // Read once, so the predicate that chose these assets and the loop that
+        // analyses them cannot disagree if the setting is changed mid-pass.
+        let wantsLoudness = settings.measuresLoudness
         let predicate: Predicate<AudioAsset>
-        if settings.measuresLoudness {
+        if wantsLoudness {
             predicate = #Predicate { $0.waveformPeaks == nil || $0.integratedLoudness == nil }
         } else {
             predicate = #Predicate { $0.waveformPeaks == nil }

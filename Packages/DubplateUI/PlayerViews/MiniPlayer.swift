@@ -57,7 +57,10 @@ public struct MiniPlayer: View {
             // The hint promised a way in and there was none: a tap gesture is not a
             // button, so VoiceOver had nothing to activate.
             .accessibilityAddTraits(.isButton)
-            .accessibilityAction(action: onOpen)
+            // `.accessibilityAction(.default, _:)`, not `action:` — the labelled
+            // form belongs to the overload that also takes a `label:` view builder,
+            // so on its own it reads as a call with an argument missing.
+            .accessibilityAction(.default, onOpen)
     }
 
     /// The Mac has no other scrubber outside the phone preview, and a producer
