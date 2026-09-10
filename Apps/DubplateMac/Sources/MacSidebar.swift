@@ -54,7 +54,9 @@ struct MacSidebar: View {
             .buttonStyle(.plain)
             .foregroundStyle(DubplateColor.secondaryText)
             .padding(DubplateLayout.s)
-            .keyboardShortcut("n", modifiers: .command)
+            // No ⌘N here. File ▸ New Release… owns it, and two live handlers for
+            // one shortcut resolve in an order that depends on which window is
+            // frontmost. Round 3 found exactly this on Space.
         }
         // Deleting a record destroys every mix in it. It is not a menu item you
         // walk past on the way to something else.

@@ -50,9 +50,8 @@ struct MacLibraryScreen: View {
             }
         }
         .dropDestination(for: URL.self) { urls, _ in
-            let audio = urls.filter { FilenameParser.isAudio($0.lastPathComponent) }
-            guard !audio.isEmpty else { return false }
-            Task { await createRelease(from: audio) }
+            guard DroppedFiles.couldHoldMedia(urls) else { return false }
+            Task { await createRelease(from: urls) }
             return true
         } isTargeted: { isTargeted = $0 }
     }
@@ -87,14 +86,22 @@ struct MacLibraryScreen: View {
     }
 
     /// A folder dropped on the library becomes a record named after the folder.
+    ///
+    /// The cover comes with it: the plan routes images to the release's artwork, so
+    /// a bounce folder that has the sleeve in it arrives complete. Nothing is
+    /// created until the drop turns out to hold audio — an empty folder must not
+    /// leave an empty record behind.
     private func createRelease(from urls: [URL]) async {
-        let folderName = urls.first?.deletingLastPathComponent().lastPathComponent ?? "New Release"
+        let plan = await library.plan(for: urls, in: nil)
+        guard !plan.isEmpty else {
+            services.announce("Nothing to add — that folder has no audio in it")
+            return
+        }
         let release = library.createRelease(
-            title: folderName,
+            title: DroppedFiles.releaseName(from: urls) ?? "",
             artistName: library.defaultArtistName,
-            type: ReleaseType.inferred(fromTrackCount: urls.count)
+            type: ReleaseType.inferred(fromTrackCount: plan.audioFileCount)
         )
-        let plan = await library.plan(for: urls, in: release)
         let outcome = await library.apply(plan, to: release)
         services.report(outcome)
         await services.registerNewMedia(in: release)

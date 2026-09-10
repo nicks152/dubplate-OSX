@@ -97,6 +97,30 @@ public enum DroppedFiles {
         urls.contains { isDirectory($0, fileManager: fileManager) && !isPackage($0) }
     }
 
+    /// Whether a drop is worth accepting, decided without walking it.
+    ///
+    /// A drop handler has to answer while Finder waits, and walking a dropped
+    /// folder to find out whether there is a bounce somewhere inside it is not
+    /// something to do in that moment. A folder is accepted on sight and expanded
+    /// afterwards; a folder that turns out to hold nothing is reported then.
+    ///
+    /// Filtering on the audio extension instead — which a directory URL does not
+    /// have — is what made the product's central gesture do nothing at all.
+    public static func couldHoldMedia(_ urls: [URL], fileManager: FileManager = .default) -> Bool {
+        urls.contains { url in
+            isInteresting(url) || (isDirectory(url, fileManager: fileManager) && !isPackage(url))
+        }
+    }
+
+    /// The name a dropped folder gives a record, or `nil` for loose files — where
+    /// guessing produces a record called "Desktop".
+    public static func releaseName(from urls: [URL], fileManager: FileManager = .default) -> String? {
+        let folders = urls.filter { isDirectory($0, fileManager: fileManager) && !isPackage($0) }
+        guard folders.count == 1, let folder = folders.first else { return nil }
+        let name = folder.lastPathComponent.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? nil : name
+    }
+
     static func isDirectory(_ url: URL, fileManager: FileManager = .default) -> Bool {
         var isDirectory: ObjCBool = false
         let exists = fileManager.fileExists(

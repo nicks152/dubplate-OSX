@@ -49,7 +49,22 @@ public struct TrackInspectorView: View {
         VStack(alignment: .leading, spacing: DubplateLayout.l) {
             field("Title", text: $track.title)
             field("Artist", text: $track.artistName)
-            field("Featured", text: Binding($track.featuredArtists) ?? .constant(""), placeholder: "Nobody")
+            // Not `Binding($track.featuredArtists) ?? .constant("")`: that
+            // initialiser returns nil while the optional is nil, which is every
+            // track whose filename did not say "feat." — so the fallback took over
+            // and the field silently discarded what was typed into it. Writing an
+            // empty string back as nil keeps the model's "no features" honest.
+            field(
+                "Featured",
+                text: Binding(
+                    get: { track.featuredArtists ?? "" },
+                    set: { newValue in
+                        let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                        track.featuredArtists = trimmed.isEmpty ? nil : newValue
+                    }
+                ),
+                placeholder: "Nobody else on it"
+            )
 
             HStack(alignment: .top, spacing: DubplateLayout.xl) {
                 // Read-only: the sequence is the drag list, and a field that looks

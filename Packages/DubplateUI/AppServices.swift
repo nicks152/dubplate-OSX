@@ -124,6 +124,45 @@ public final class AppServices {
         }
     }
 
+    /// Asks for the file playback is holding on, again.
+    public func retryPendingDownload() {
+        guard let waiting = player.awaitingDownloadOf else { return }
+        Task { await fetchAndResume(waiting) }
+    }
+
+    /// What "Try Again" does for a given failure, or nil when there is nothing the
+    /// application could do differently. Nil means no button, which is the whole
+    /// point: `retryTitle` and this have to agree, or the copy names a control that
+    /// is not there.
+    public func retryAction(for error: DubplateError) -> (() -> Void)? {
+        switch error.kind {
+        case .transferFailed, .iCloudUnavailable:
+            return { [weak self] in
+                guard let self else { return }
+                clearErrors()
+                Task { await sync.syncNow() }
+            }
+        case .notDownloadedYet:
+            return { [weak self] in
+                guard let self else { return }
+                clearErrors()
+                downloadBlockedByCellular = false
+                retryPendingDownload()
+            }
+        default:
+            return nil
+        }
+    }
+
+    /// Clears every channel the banner can be showing, in one place, because both
+    /// applications were spelling the same four lines out by hand.
+    public func clearErrors() {
+        library.lastError = nil
+        player.clearError()
+        sync.clearError()
+        dismissStartupNotice()
+    }
+
     /// The real thing.
     public static func live() -> AppServices {
         let settings = DubplateSettings()

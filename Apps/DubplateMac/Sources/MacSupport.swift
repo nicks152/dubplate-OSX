@@ -122,11 +122,11 @@ struct InboxScreen: View {
             if isTargeted { DropOverlay(message: "Add to Inbox") }
         }
         .dropDestination(for: URL.self) { urls, _ in
-            let audio = urls.filter { FilenameParser.isAudio($0.lastPathComponent) }
-            guard !audio.isEmpty else { return false }
+            guard DroppedFiles.couldHoldMedia(urls) else { return false }
             Task {
-                let plan = await library.plan(for: audio, in: nil)
-                await library.apply(plan, to: nil)
+                let plan = await library.plan(for: urls, in: nil)
+                let outcome = await library.apply(plan, to: nil)
+                services.report(outcome)
                 await services.registerNewMedia(in: nil)
             }
             return true

@@ -14,6 +14,7 @@
 		B1DA97354C0344205644031A /* MacSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = D178B95498E6D22C5D5E280B /* MacSupport.swift */; };
 		FEE779357F6B438123D96EAE /* PhonePreviewWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2788E1471F6A36896B4E2CFF /* PhonePreviewWindow.swift */; };
 		6B0F4B3720BE3DB637A428A2 /* ReleaseDetailScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11F7B28A5912F696B61D3F72 /* ReleaseDetailScreen.swift */; };
+		AE324689A6DD9F9B8887E7F9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D0179E4F0A7A40913A625619 /* Assets.xcassets */; };
 		0E69C8A8A0D9FC7E9F0FE964 /* DubplateCore in Frameworks */ = {isa = PBXBuildFile; productRef = 28430C9D35B7AB1858CC910C /* DubplateCore */; };
 		727FD55C75861C9810C98BF1 /* DubplateAudio in Frameworks */ = {isa = PBXBuildFile; productRef = 86EEC006AF3E43C1D79E03B3 /* DubplateAudio */; };
 		3CD387AD40AD1287C645206E /* DubplateSync in Frameworks */ = {isa = PBXBuildFile; productRef = 396E9CC568DB94526D0BCF0B /* DubplateSync */; };
@@ -23,6 +24,7 @@
 		50BCFAC8D3976792C4BAA79F /* PhonePlayerScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = C17016B88C203849D12A4878 /* PhonePlayerScreen.swift */; };
 		4717F651FBF198895BDF252E /* PhoneReleaseScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100116FE512587C5C03E744 /* PhoneReleaseScreen.swift */; };
 		AAF9A82589807C8BD90AE4CB /* PhoneRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 159AA291A8AF89C1F130232A /* PhoneRootView.swift */; };
+		A8DF09A4736D0A43524C9127 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E71EF06DF86FE1169F77D277 /* Assets.xcassets */; };
 		9CF2B982D9DF0141F790866E /* DubplateCore in Frameworks */ = {isa = PBXBuildFile; productRef = ABBF5CDDFD4A778D0A15ED92 /* DubplateCore */; };
 		1A442721F00D57403CD6D411 /* DubplateAudio in Frameworks */ = {isa = PBXBuildFile; productRef = 6576297C8DE266C57E9A1165 /* DubplateAudio */; };
 		FE301FC6569306505179B676 /* DubplateSync in Frameworks */ = {isa = PBXBuildFile; productRef = EE53C76758067043AA187697 /* DubplateSync */; };
@@ -50,6 +52,8 @@
 		FC95CA1FE3C22F4D0C000C4C /* Dubplate.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Dubplate.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BE4C232D8C9D36A69A841276 /* DubplateMacUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DubplateMacUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D1F8968AADE4787460192D9B /* DubplateiOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DubplateiOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		D0179E4F0A7A40913A625619 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = DubplateMac/Resources/Assets.xcassets; sourceTree = "<group>"; };
+		E71EF06DF86FE1169F77D277 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = DubplateiOS/Resources/Assets.xcassets; sourceTree = "<group>"; };
 		8691BE024B1B5119B83CCB26 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = Info.plist; path = DubplateMac/Resources/Info.plist; sourceTree = "<group>"; };
 		C8DC21BF39A434684E7F71AF /* Dubplate.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = Dubplate.entitlements; path = DubplateMac/Resources/Dubplate.entitlements; sourceTree = "<group>"; };
 		2BAA7AE5DE825226081D5D3A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = Info.plist; path = DubplateiOS/Resources/Info.plist; sourceTree = "<group>"; };
@@ -130,6 +134,7 @@
 				11F7B28A5912F696B61D3F72 /* ReleaseDetailScreen.swift */,
 				8691BE024B1B5119B83CCB26 /* Info.plist */,
 				C8DC21BF39A434684E7F71AF /* Dubplate.entitlements */,
+				D0179E4F0A7A40913A625619 /* Assets.xcassets */,
 			);
 			name = "Dubplate Mac";
 			sourceTree = "<group>";
@@ -144,6 +149,7 @@
 				159AA291A8AF89C1F130232A /* PhoneRootView.swift */,
 				2BAA7AE5DE825226081D5D3A /* Info.plist */,
 				A809D46B3862F93D34E399AD /* Dubplate.entitlements */,
+				E71EF06DF86FE1169F77D277 /* Assets.xcassets */,
 			);
 			name = "Dubplate iOS";
 			sourceTree = "<group>";
@@ -304,6 +310,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AE324689A6DD9F9B8887E7F9 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -311,6 +318,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A8DF09A4736D0A43524C9127 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -465,6 +473,8 @@
 		E4C98BDFBF2A55425CC977A6 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = DubplateMac/Resources/Dubplate.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -480,6 +490,8 @@
 		2C709F3C3CBCE5D7AD5B9A3C /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = DubplateMac/Resources/Dubplate.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -495,6 +507,8 @@
 		08C4E21144B0C71030F8C7C6 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = DubplateiOS/Resources/Dubplate.entitlements;
 				INFOPLIST_FILE = DubplateiOS/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -503,13 +517,15 @@
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
 		E156C9A99A6051A82895A29E /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = DubplateiOS/Resources/Dubplate.entitlements;
 				INFOPLIST_FILE = DubplateiOS/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -518,7 +534,7 @@
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};

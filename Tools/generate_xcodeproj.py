@@ -55,6 +55,15 @@ class Target:
         self.platform = platform
         self.extra = extra or {}
         self.sources = swift_files(sources_dir)
+        # Applications carry one asset catalog: the icon, and the accent colour the
+        # system uses for its own controls. Added as a folder reference, which is
+        # how Xcode itself references a `.xcassets`.
+        prefix = "DubplateMac" if platform == "macos" else "DubplateiOS"
+        self.assets = (
+            f"{prefix}/Resources/Assets.xcassets"
+            if product_type.endswith("application")
+            else None
+        )
         self.id = ident("target", name)
         self.product_id = ident("product", name)
         self.sources_phase = ident("sources", name)
@@ -81,6 +90,8 @@ def build_targets() -> list[Target]:
                 "SUPPORTED_PLATFORMS": "macosx",
                 "ENABLE_HARDENED_RUNTIME": "YES",
                 "COMBINE_HIDPI_IMAGES": "YES",
+                "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
+                "ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME": "AccentColor",
             },
         ),
         Target(
@@ -96,7 +107,12 @@ def build_targets() -> list[Target]:
                 "IPHONEOS_DEPLOYMENT_TARGET": IOS_DEPLOYMENT,
                 "SDKROOT": "iphoneos",
                 "SUPPORTED_PLATFORMS": "iphoneos iphonesimulator",
-                "TARGETED_DEVICE_FAMILY": "1,2",
+                # iPhone only. The interface is a portrait stack with a floating
+                # mini player and no split view; shipping it to iPad would mean a
+                # stretched phone app at 1366 points wide.
+                "TARGETED_DEVICE_FAMILY": "1",
+                "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
+                "ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME": "AccentColor",
                 "SUPPORTS_MACCATALYST": "NO",
             },
         ),
@@ -216,6 +232,11 @@ def generate() -> str:
             build_id = ident("build", target.name, path)
             add(f"\t\t{build_id} /* {os.path.basename(path)} in Sources */ = "
                 f"{{isa = PBXBuildFile; fileRef = {file_id} /* {os.path.basename(path)} */; }};")
+        if target.assets:
+            file_id = ident("file", target.assets)
+            build_id = ident("build", target.name, target.assets)
+            add(f"\t\t{build_id} /* Assets.xcassets in Resources */ = "
+                f"{{isa = PBXBuildFile; fileRef = {file_id} /* Assets.xcassets */; }};")
         if target.product_type == "com.apple.product-type.application":
             for product in PRODUCTS:
                 dep_id = ident("packageproduct", target.name, product)
@@ -244,6 +265,13 @@ def generate() -> str:
         add(f"\t\t{target.product_id} /* {product_name}.{extension} */ = {{isa = PBXFileReference; "
             f"explicitFileType = {file_type}; includeInIndex = 0; "
             f"path = {quote(product_name + '.' + extension)}; sourceTree = BUILT_PRODUCTS_DIR; }};")
+    for target in targets:
+        if not target.assets:
+            continue
+        file_id = ident("file", target.assets)
+        add(f"\t\t{file_id} /* Assets.xcassets */ = {{isa = PBXFileReference; "
+            f"lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; "
+            f"path = {quote(target.assets)}; sourceTree = \"<group>\"; }};")
     for plist in ["DubplateMac/Resources/Info.plist", "DubplateMac/Resources/Dubplate.entitlements",
                   "DubplateiOS/Resources/Info.plist", "DubplateiOS/Resources/Dubplate.entitlements"]:
         file_id = ident("file", plist)
@@ -302,6 +330,8 @@ def generate() -> str:
             for name in ["Info.plist", "Dubplate.entitlements"]:
                 path = f"{prefix}/Resources/{name}"
                 add(f"\t\t\t\t{ident('file', path)} /* {name} */,")
+            if target.assets:
+                add(f"\t\t\t\t{ident('file', target.assets)} /* Assets.xcassets */,")
         add("\t\t\t);")
         add(f"\t\t\tname = {quote(target.name)};")
         add("\t\t\tsourceTree = \"<group>\";")
@@ -385,6 +415,9 @@ def generate() -> str:
         add("\t\t\tisa = PBXResourcesBuildPhase;")
         add("\t\t\tbuildActionMask = 2147483647;")
         add("\t\t\tfiles = (")
+        if target.assets:
+            build_id = ident("build", target.name, target.assets)
+            add(f"\t\t\t\t{build_id} /* Assets.xcassets in Resources */,")
         add("\t\t\t);")
         add("\t\t\trunOnlyForDeploymentPostprocessing = 0;")
         add("\t\t};")

@@ -39,6 +39,7 @@ struct MacRootView: View {
 
     @State private var section: LibrarySection = .albums
     @State private var isShowingNewRelease = false
+    @State private var isShowingStorageHelp = false
     @State private var searchText = ""
     @Environment(\.openWindow) private var openWindow
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
@@ -80,12 +81,11 @@ struct MacRootView: View {
                     }
                 }
                 if let error = visibleError {
-                    ErrorBanner(error: error) {
-                        library.lastError = nil
-                        player.clearError()
-                        services.sync.clearError()
-                        services.dismissStartupNotice()
-                    }
+                    ErrorBanner(
+                        error: error,
+                        onRetry: services.retryAction(for: error),
+                        onDismiss: services.clearErrors
+                    )
                 }
             }
             .padding(DubplateLayout.xl)
@@ -111,6 +111,22 @@ struct MacRootView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .dubplateTogglePreview)) { _ in
             openWindow(id: DubplateWindow.phonePreview)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .dubplateShowStorageHelp)) { _ in
+            isShowingStorageHelp = true
+        }
+        .alert("Where your bounces live", isPresented: $isShowingStorageHelp) {
+            Button("Show in Finder") { RevealInFinder.reveal(services.mediaStore.root) }
+            Button("Done", role: .cancel) {}
+        } message: {
+            Text(
+                "Dubplate copies every bounce into its own folder and never touches "
+                + "the file you dragged in. Your originals stay exactly where they "
+                + "are, under whatever name you gave them.\n\n"
+                + "With iCloud on, those copies sync to your other devices through "
+                + "your own private iCloud. Nothing is uploaded anywhere else, "
+                + "nothing is published, and no one but you can reach it."
+            )
         }
     }
 

@@ -7,7 +7,6 @@ import Foundation
 public struct DubplateError: LocalizedError, Identifiable, Sendable {
     public enum Kind: String, Sendable {
         case unreadableAudio
-        case unsupportedFile
         case importFailed
         case fileMissing
         case notDownloadedYet
@@ -37,8 +36,6 @@ public struct DubplateError: LocalizedError, Identifiable, Sendable {
         switch kind {
         case .unreadableAudio, .playbackFailed:
             return "Dubplate couldn’t play this audio file."
-        case .unsupportedFile:
-            return "Dubplate doesn’t recognise this kind of file."
         case .importFailed:
             return "Dubplate couldn’t import this file."
         case .fileMissing:
@@ -64,8 +61,6 @@ public struct DubplateError: LocalizedError, Identifiable, Sendable {
         switch kind {
         case .unreadableAudio, .playbackFailed:
             return "It may be an unusual format, or the file may be incomplete. Try re-bouncing it as WAV or AIFF."
-        case .unsupportedFile:
-            return "Dubplate plays WAV, AIFF, CAF, FLAC, ALAC, AAC, M4A and MP3."
         case .importFailed:
             return "Check the file is still on disk, then drag it in again."
         case .fileMissing:
@@ -88,10 +83,14 @@ public struct DubplateError: LocalizedError, Identifiable, Sendable {
     }
 
     /// The label on the primary button of the error, if a retry makes sense.
+    ///
+    /// Only failures the application can actually do something about. There is no
+    /// "Locate File…" here because there is no locate flow: a promise of a button
+    /// that does not exist is worse than no button, and for a missing file the
+    /// detail already says the right thing, which is to drop the bounce in again.
     public var retryTitle: String? {
         switch kind {
         case .transferFailed, .iCloudUnavailable, .notDownloadedYet: return "Try Again"
-        case .fileMissing, .importFailed: return "Locate File…"
         default: return nil
         }
     }

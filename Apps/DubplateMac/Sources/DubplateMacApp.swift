@@ -40,10 +40,13 @@ struct DubplateMacApp: App {
                 .environment(services.artwork)
                 .environment(services.settings)
                 .modelContainer(services.container)
+                // Every scene has its own root, so the Appearance setting has to be
+                // applied to each of them. Applying it only to the main window gave
+                // a dark window beside two light ones.
+                .preferredColorScheme(services.settings.appearance.colorScheme)
                 .tint(DubplateColor.primaryText)
         }
         .defaultSize(width: 480, height: 920)
-        .keyboardShortcut("p", modifiers: [.command, .shift])
 
         Settings {
             MacSettingsView()
@@ -56,6 +59,7 @@ struct DubplateMacApp: App {
                 .environment(services.sync)
                 .environment(services.settings)
                 .modelContainer(services.container)
+                .preferredColorScheme(services.settings.appearance.colorScheme)
                 .tint(DubplateColor.primaryText)
         }
     }
@@ -80,23 +84,35 @@ struct DubplateCommands: Commands {
             }
             .keyboardShortcut("n", modifiers: .command)
 
+            // Only the release screen can answer this, so on every other screen
+            // the item is disabled rather than enabled and inert. A permanently
+            // enabled menu item that does nothing is the most recognisable sign
+            // of unfinished Mac software, and this is what `selectedRelease` was
+            // published for.
             Button("Import Audio…") {
                 NotificationCenter.default.post(name: .dubplateImportAudio, object: nil)
             }
             .keyboardShortcut("i", modifiers: .command)
+            .disabled(selectedRelease == nil)
         }
 
         CommandMenu("Playback") {
+            // ⌥Space, not bare Space. AppKit consults the main menu's key
+            // equivalents before the field editor, so a bare Space here would
+            // toggle playback while someone is typing a release title.
             Button(services.player.isPlaying ? "Pause" : "Play") {
                 services.player.togglePlayPause()
             }
-            .keyboardShortcut(.space, modifiers: [])
+            .keyboardShortcut(.space, modifiers: .option)
+            .disabled(services.player.currentItem == nil)
 
             Button("Next Track") { services.player.next() }
                 .keyboardShortcut(.rightArrow, modifiers: .command)
+                .disabled(services.player.currentItem == nil)
 
             Button("Previous Track") { services.player.previous() }
                 .keyboardShortcut(.leftArrow, modifiers: .command)
+                .disabled(services.player.currentItem == nil)
 
             Divider()
 
@@ -111,6 +127,16 @@ struct DubplateCommands: Commands {
             Button("Show iPhone") {
                 NotificationCenter.default.post(name: .dubplateTogglePreview, object: nil)
             }
+            .keyboardShortcut("p", modifiers: [.command, .shift])
+        }
+
+        // The default Help item opens a help book that does not exist and says
+        // so. Dubplate's help is the product being obvious; the one thing worth
+        // offering is the sentence about where the files actually are.
+        CommandGroup(replacing: .help) {
+            Button("What Dubplate Does With Your Files") {
+                NotificationCenter.default.post(name: .dubplateShowStorageHelp, object: nil)
+            }
         }
     }
 }
@@ -119,6 +145,7 @@ extension Notification.Name {
     static let dubplateNewRelease = Notification.Name("dubplate.newRelease")
     static let dubplateImportAudio = Notification.Name("dubplate.importAudio")
     static let dubplateTogglePreview = Notification.Name("dubplate.togglePreview")
+    static let dubplateShowStorageHelp = Notification.Name("dubplate.showStorageHelp")
 }
 
 /// Lets the menu bar know which release the window is showing.

@@ -58,12 +58,11 @@ struct PhoneRootView: View {
                     }
                 }
                 if let error = library.lastError ?? player.lastError ?? services.sync.lastError ?? services.startupNotice {
-                    ErrorBanner(error: error) {
-                        library.lastError = nil
-                        player.clearError()
-                        services.sync.clearError()
-                        services.dismissStartupNotice()
-                    }
+                    ErrorBanner(
+                        error: error,
+                        onRetry: services.retryAction(for: error),
+                        onDismiss: services.clearErrors
+                    )
                 }
             }
             .padding(DubplateLayout.l)
