@@ -126,6 +126,26 @@ public actor MediaIndex {
         if isDirty { persist() }
     }
 
+    /// Coalesces writes.
+    ///
+    /// A first sync marks thousands of assets uploaded one at a time; rewriting the
+    /// whole file on each of them is quadratic in bytes written and was by some
+    /// distance the worst hot spot in the sync layer.
+    private func markDirty() {
+        isDirty = true
+        guard flushTask == nil else { return }
+        flushTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(400))
+            await self?.performScheduledFlush()
+        }
+    }
+
+    private func performScheduledFlush() {
+        flushTask = nil
+        guard isDirty else { return }
+        persist()
+    }
+
     private func load() {
         guard !isLoaded else { return }
         isLoaded = true
@@ -134,6 +154,7 @@ public actor MediaIndex {
             let decoded = try JSONDecoder().decode([MediaDescriptor].self, from: data)
             descriptors = Dictionary(uniqueKeysWithValues: decoded.map { ($0.assetID, $0) })
         } catch {
+            isRecovering = true
             Log.sync.error("Media index unreadable, starting a new one: \(String(describing: error))")
         }
     }

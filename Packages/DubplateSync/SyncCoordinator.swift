@@ -323,7 +323,6 @@ public final class SyncCoordinator {
     }
 
     private func setTransferring(_ active: Bool) {
-        isTransferring = active
         status = active ? .syncing : .synced
         if !active { lastSyncedAt = Date() }
     }

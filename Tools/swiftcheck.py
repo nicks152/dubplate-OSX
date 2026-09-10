@@ -411,6 +411,143 @@ def check_swiftdata_models(module: Module, sources: dict[str, str], findings: li
                         "for CloudKit mirroring"))
 
 
+MEMBER_FUNC_RE = re.compile(
+    r"(?m)^[ \t]*(?:@\w+(?:\([^)]*\))?[ \t]*)*"
+    r"(?:public |private |fileprivate |internal |package |static |class |final |override |mutating |nonisolated |convenience )*"
+    r"func\s+(\w+)\s*[(<]"
+)
+MEMBER_VAR_RE = re.compile(
+    r"(?m)^[ \t]*(?:@\w+(?:\([^)]*\))?[ \t]*)*"
+    r"(?:public |private |fileprivate |internal |package |static |class |final |lazy |weak |unowned )*"
+    r"(?:var|let)\s+(\w+)"
+)
+BARE_CALL_RE = re.compile(r"(?<![\.\w$])([a-z_][A-Za-z0-9_]*)\s*\(")
+
+SWIFT_GLOBAL_FUNCTIONS = {
+    "min", "max", "abs", "sqrt", "sin", "cos", "tan", "atan", "atan2", "exp",
+    "log", "log2", "log10", "pow", "round", "ceil", "floor", "swap", "zip",
+    "stride", "type", "print", "dump", "assert", "assertionFailure", "precondition",
+    "preconditionFailure", "fatalError", "withAnimation", "withTransaction",
+    "withUnsafeBytes", "withUnsafePointer", "withUnsafeMutableBytes",
+    "unsafeBitCast", "sequence", "repeatElement", "isKnownUniquelyReferenced",
+    "withCheckedContinuation", "withCheckedThrowingContinuation", "withTaskGroup",
+    "withThrowingTaskGroup", "withTaskCancellationHandler", "autoreleasepool",
+    "getter", "setter", "if", "guard", "while", "for", "switch", "return", "catch",
+    "init", "deinit", "super", "self", "throw", "try", "await", "async", "in",
+    "where", "case", "default", "do", "else", "repeat", "defer",
+    # `let (a, b) = …` destructuring, and the compiler directives.
+    "let", "var", "os", "canImport", "swift", "compiler", "targetEnvironment", "arch",
+    "_",
+    # `public private(set) var …` and friends.
+    "private", "fileprivate", "internal", "public", "package", "open",
+    "nonisolated", "unsafe", "set", "get", "willSet", "didSet", "some", "any",
+}
+SELF_MEMBER_RE = re.compile(r"\bself\??\.([a-zA-Z_][A-Za-z0-9_]*)")
+# `isTransferring = active` on its own line, where nothing declares isTransferring.
+BARE_ASSIGN_RE = re.compile(r"(?m)^[ \t]+([a-z_][A-Za-z0-9_]*)\s*(?:=|\+=|-=)\s*[^=]")
+
+
+def check_own_members(module: Module, sources: dict[str, str], allow: set[str],
+                      findings: list[Finding]) -> None:
+    """Resolve calls a type makes on itself against what it actually declares.
+
+    This is the check that catches a method that was renamed, never written, or
+    lost to a bad patch — the class of mistake that looks fine in review and fails
+    at the first build. Only types that inherit nothing are checked, because a
+    subclass can legitimately call something it did not declare.
+    """
+    for path in module.files:
+        code = sources[path]
+        for match in DECL_RE.finditer(code):
+            kind, name = match.group(1), match.group(2)
+            if kind not in {"struct", "enum", "actor", "class"}:
+                continue
+            header_end = code.find("{", match.end())
+            if header_end == -1:
+                continue
+            header = code[match.end():header_end]
+            # `: SomeProtocol` is fine; `: SomeClass` may bring inherited members,
+            # and a non-final class may be subclassed. Skip anything not obviously
+            # self-contained.
+            # A non-final class may be subclassed, and a subclass legitimately uses
+            # members it did not declare. The modifiers are part of the match.
+            if kind == "class" and "final" not in match.group(0):
+                continue
+            if ":" in header:
+                continue
+
+            depth = 0
+            end = header_end
+            for index in range(header_end, len(code)):
+                if code[index] == "{":
+                    depth += 1
+                elif code[index] == "}":
+                    depth -= 1
+                    if depth == 0:
+                        end = index
+                        break
+            body = code[header_end:end]
+            offset = code[:header_end].count("\n") + 1
+
+            declared = set(MEMBER_FUNC_RE.findall(body)) | set(MEMBER_VAR_RE.findall(body))
+            # Extensions of the same type, anywhere in the module, count too.
+            for other in module.files:
+                other_code = sources[other]
+                for extension in re.finditer(
+                    r"(?m)^[ \t]*(?:public |private |fileprivate |package )*extension\s+"
+                    + re.escape(name) + r"\b", other_code
+                ):
+                    start = other_code.find("{", extension.end())
+                    if start == -1:
+                        continue
+                    inner_depth = 0
+                    stop = start
+                    for index in range(start, len(other_code)):
+                        if other_code[index] == "{":
+                            inner_depth += 1
+                        elif other_code[index] == "}":
+                            inner_depth -= 1
+                            if inner_depth == 0:
+                                stop = index
+                                break
+                    section = other_code[start:stop]
+                    declared |= set(MEMBER_FUNC_RE.findall(section))
+                    declared |= set(MEMBER_VAR_RE.findall(section))
+
+            # Anything bound anywhere in the body — including a local `let` holding
+            # a closure — counts as declared, which keeps this quiet enough to trust.
+            declared |= set(re.findall(r"\b(?:let|var)\s+(\w+)", body))
+            declared |= set(re.findall(r"\bcase\s+(\w+)", body))
+            declared |= set(re.findall(r"(\w+)\s*:\s*[A-Za-z_(\[]", body))
+
+            for reference in SELF_MEMBER_RE.finditer(body):
+                member = reference.group(1)
+                if member in declared or member in allow:
+                    continue
+                line = offset + body[: reference.start()].count("\n")
+                findings.append(Finding(
+                    "error", rel(path), line, "unknown-member",
+                    f"'{name}' has no member '{member}'"))
+
+            for reference in BARE_ASSIGN_RE.finditer(body):
+                assigned = reference.group(1)
+                if assigned in declared or assigned in allow or assigned in SWIFT_GLOBAL_FUNCTIONS:
+                    continue
+                line = offset + body[: reference.start()].count("\n")
+                findings.append(Finding(
+                    "error", rel(path), line, "unknown-member",
+                    f"'{name}' assigns '{assigned}', which it does not declare"))
+
+            for reference in BARE_CALL_RE.finditer(body):
+                called = reference.group(1)
+                if called in declared or called in allow or called in SWIFT_GLOBAL_FUNCTIONS:
+                    continue
+                line = offset + body[: reference.start()].count("\n")
+                findings.append(Finding(
+                    "error", rel(path), line, "unknown-member",
+                    f"'{name}' calls '{called}()', which it does not declare"))
+
+
 ENVIRONMENT_USE_RE = re.compile(r"@Environment\(\s*([A-Z][A-Za-z0-9_]*)\.self\s*\)")
 ENVIRONMENT_INJECT_RE = re.compile(r"\.environment\(\s*([A-Za-z0-9_.]+)")
 
@@ -568,6 +705,8 @@ def main() -> int:
     for module in modules:
         collect_declarations(module, sources, findings)
     check_environment_objects(modules, sources, findings)
+    for module in modules:
+        check_own_members(module, sources, allow, findings)
     for module in modules:
         check_imports(module, sources, first_party, allow, findings)
         check_type_references(module, by_name, sources, allow, findings)

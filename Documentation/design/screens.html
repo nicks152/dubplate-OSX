@@ -22,14 +22,14 @@
     --hairline: rgba(244,243,241,0.10);
     --primary: #F4F3F1;
     --secondary: rgba(244,243,241,0.60);
-    --tertiary: rgba(244,243,241,0.38);
+    --tertiary: rgba(244,243,241,0.50);
     --alert: #E0684E;
     --player-ground: #0B0B0C;
     --player-primary: #F4F3F1;
     --player-secondary: rgba(245,243,241,0.62);
     /* ---- DubplateLayout ---- */
     --xs: 4px; --s: 8px; --m: 12px; --l: 16px; --xl: 24px; --xxl: 32px; --xxxl: 48px;
-    --artwork-radius: 6px; --large-artwork-radius: 10px; --control-radius: 8px;
+    --artwork-radius: 4px; --control-radius: 8px;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -57,8 +57,9 @@
   /* ---- artwork ---- */
   .art { border-radius: var(--artwork-radius); position: relative; overflow: hidden;
          box-shadow: 0 4px 10px rgba(0,0,0,0.16); outline: 1px solid var(--hairline); outline-offset: -1px; }
-  .art .name { position: absolute; left: 8%; bottom: 8%; right: 8%; color: rgba(255,255,255,0.82);
-                font-weight: 600; text-transform: uppercase; line-height: 1.15; }
+  .art .name { position: absolute; left: 9%; top: 9%; right: 9%; color: #fff;
+               font-weight: 600; text-transform: uppercase; line-height: 1.06; }
+  .art .credit { position: absolute; left: 9%; top: 9%; right: 9%; color: rgba(255,255,255,0.6); }
 
   /* ---- mac chrome ---- */
   .sidebar { width: 232px; background: var(--raised); border-right: 1px solid var(--hairline);
@@ -78,7 +79,7 @@
              display: flex; align-items: center; justify-content: center; font-size: 12px; }
 
   /* ---- library grid ---- */
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 32px 20px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 24px; }
   .card .art { width: 100%; aspect-ratio: 1; margin-bottom: var(--m); }
   .card .t { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .card .a { font-size: 13px; color: var(--secondary); }
@@ -105,7 +106,8 @@
   .inspector { width: 320px; background: var(--raised); border-left: 1px solid var(--hairline);
                padding: var(--xl); display: flex; flex-direction: column; gap: var(--xl); flex: none; overflow: hidden; }
   .field { display: flex; flex-direction: column; gap: var(--xs); }
-  .field .box { background: var(--sunken); border-radius: var(--control-radius); padding: 8px 12px; font-size: 14px; }
+  .field .box { font-size: 15px; padding: 0 0 5px; border-bottom: 1px solid var(--hairline); }
+  .field .box.focused { border-bottom-color: var(--primary); }
   .rule { height: 1px; background: var(--hairline); }
 
   /* ---- scrubber ---- */
@@ -128,17 +130,18 @@ function shades(title) {
   for (const byte of new TextEncoder().encode(title || 'Untitled')) {
     hash = BigInt.asUintN(64, hash * 33n + BigInt(byte));
   }
-  const base = Number(hash % 26n) / 100 + 0.10;
-  const g = v => `rgb(${Math.round(v*255)},${Math.round(v*255)},${Math.round(v*255)})`;
-  return [g(base + 0.16), g(base)];
+  const hue = Number(hash % 360n);
+  return [`hsl(${hue} 12% 30%)`, `hsl(${hue} 14% 13%)`];
 }
-function art(title, size, radius) {
+function art(title, size, radius, artist) {
   const [a, b] = shades(title);
   const edge = typeof size === 'number' ? size + 'px' : size;
-  const px = typeof size === 'number' ? size : 200;
-  return `<div class="art" style="width:${edge};height:${edge};border-radius:${radius||6}px;
-    background:linear-gradient(135deg, ${a}, ${b})">
-    <div class="name" style="font-size:${Math.max(9, px*0.088)}px;letter-spacing:${px*0.006}px">${title}</div></div>`;
+  const px = typeof size === 'number' ? size : 220;
+  const type = px >= 64 ? `
+    <div class="name" style="font-size:${px*0.15}px;letter-spacing:${px*-0.0033}px">${title}</div>
+    ${artist ? `<div class="credit" style="font-size:${px*0.045}px;top:auto;bottom:9%">${artist}</div>` : ''}` : '';
+  return `<div class="art" style="width:${edge};height:${edge};border-radius:${radius === 0 ? 0 : (radius || 4)}px;
+    background:linear-gradient(135deg, ${a}, ${b})">${type}</div>`;
 }
 function waveform(count, progress, colorOn, colorOff) {
   let out = '';
@@ -160,13 +163,13 @@ function screen(id, caption, cls, inner) {
 const sidebar = (active) => `
 <div class="sidebar">
   <div class="section">Library</div>
-  ${[['Recently Played','◷'],['Albums','▤'],['EPs','▢'],['Singles','◯'],['All Projects','▦'],['Inbox','▽']]
-    .map(([t,g]) => `<div class="item ${t===active?'on':''}"><span class="glyph">${g}</span>${t}</div>`).join('')}
+  ${['Recently Played','Albums','EPs','Singles','All Projects','Inbox']
+    .map(t => `<div class="item ${t===active?'on':''}">${t}</div>`).join('')}
   <div class="section" style="margin-top:12px">Releases</div>
   ${LIB.slice(0,4).map(t => `<div class="item"><span style="width:20px;height:20px;border-radius:3px;flex:none;
       background:linear-gradient(135deg,${shades(t)[0]},${shades(t)[1]})"></span>${t}</div>`).join('')}
   <div style="flex:1"></div>
-  <div class="item" style="color:var(--tertiary)"><span class="glyph">+</span>New Release</div>
+  <div class="item" style="color:var(--tertiary)">+&nbsp;&nbsp;New Release</div>
 </div>`;
 const mini = (t, a) => `
 <div class="mini" style="position:relative">
@@ -186,12 +189,10 @@ ${sidebar('Albums')}
 <div class="detail">
   <div class="toolbar"><span class="meta">Syncing</span><span class="meta">◻ Phone Preview</span></div>
   <div style="padding:32px;overflow:hidden;flex:1">
-    <div class="display-30">Albums</div>
-    <div class="meta" style="margin-top:4px;margin-bottom:24px">6 releases</div>
+    <div class="display-30" style="margin-bottom:24px">Albums</div>
     <div class="grid">
-      ${LIB.map((t,i) => `<div class="card">${art(t,'100%',6)}
-        <div class="t">${t}</div><div class="a">Nick Loder</div>
-        <div class="m">${['Album · 10 tracks','EP · 4 tracks','Single · 1 track','Album · 8 tracks','Project · 3 tracks','EP · 5 tracks'][i]}</div></div>`).join('')}
+      ${LIB.map((t,i) => `<div class="card">${art(t,220,4,'Nick Loder')}
+        <div class="t">${t}</div><div class="a">Nick Loder</div></div>`).join('')}
     </div>
   </div>
   ${mini('Midnight','Nick Loder')}
@@ -205,7 +206,7 @@ ${sidebar('Albums')}
   <div style="display:flex;flex:1;min-height:0">
     <div style="flex:1;display:flex;flex-direction:column;min-width:0">
       <div style="padding:32px;display:flex;gap:24px;align-items:flex-end">
-        ${art('NO SIGNAL', 220, 10)}
+        ${art('NO SIGNAL', 300, 4, 'Nick Loder')}
         <div style="display:flex;flex-direction:column;gap:12px;padding-bottom:4px">
           <div class="label">Album</div>
           <div class="display-44">NO SIGNAL</div>
@@ -217,16 +218,14 @@ ${sidebar('Albums')}
         </div>
       </div>
       <div style="padding:0 24px 12px">
-        <div style="display:flex;align-items:center;gap:8px;background:var(--sunken);border-radius:8px;
-                    padding:8px 12px;color:var(--secondary);font-size:12px">
-          <span>⌁</span><span>Track 4 is 44.1 kHz after 48 kHz. That join won’t be gapless — re-bounce it to match.</span>
-        </div>
+        <div style="color:var(--secondary);font-size:12px">Track 4 is 44.1 kHz after 48 kHz.
+          That join won’t be gapless — re-bounce it to match.</div>
       </div>
       <div style="padding:0 24px;overflow:hidden">
         ${NO_SIGNAL.map((t,i) => `<div class="track ${i===5?'sel':''}">
           <span class="num">${i===5?'<span class="bars"><i style="height:4px"></i><i style="height:10px"></i><i style="height:6px"></i></span>':(i+1)}</span>
           <span class="name" style="${i===5?'color:var(--primary)':''}">${t}</span>
-          ${i===5?'<span class="pill">4 mixes</span>':''}
+          ${i===5?'<span class="pill">4 mixes</span><span style="color:var(--tertiary);width:32px;text-align:center">⋯</span>':''}
           <span class="dur">${DURS[i]}</span></div>`).join('')}
       </div>
     </div>
@@ -308,7 +307,7 @@ screen('mac-preview', 'Mac · Phone preview', 'mac', `
   <div style="width:393px;height:600px;border-radius:44px;border:1px solid rgba(255,255,255,0.12);
               background:var(--player-ground);box-shadow:0 20px 40px rgba(0,0,0,0.5);overflow:hidden;
               display:flex;flex-direction:column;align-items:center;gap:18px;padding:28px 24px">
-    ${art('NO SIGNAL', 300, 10)}
+    ${art('NO SIGNAL', 300, 4, 'Nick Loder')}
     <div style="text-align:center"><div class="np-title">Midnight</div>
       <div class="np-artist" style="margin-top:4px">Nick Loder</div></div>
     <div style="width:100%">${waveform(110, 0.34, 'var(--player-primary)', 'rgba(245,243,241,0.22)')}
@@ -317,7 +316,7 @@ screen('mac-preview', 'Mac · Phone preview', 'mac', `
     <div class="transport" style="gap:24px;color:var(--player-primary)"><span style="opacity:0.42">⤨</span><span>◀◀</span>
       <span class="playbtn" style="width:52px;height:52px;font-size:18px">❚❚</span><span>▶▶</span><span style="opacity:0.42">⟳</span></div>
   </div>
-  <div class="meta">Dense and dark. How most people will glance at it.</div>
+
 </div>`);
 
 /* 5. Phone home */
@@ -325,8 +324,8 @@ screen('phone-home', 'iPhone · Home', 'phone', `
 <div style="padding:16px 16px 0;height:100%;display:flex;flex-direction:column">
   <div style="height:44px"></div>
   <div class="display-30" style="margin-bottom:16px">Dubplate</div>
-  <div class="label" style="margin-bottom:12px">Recently Played</div>
-  <div style="display:flex;justify-content:center">${art('NO SIGNAL', 300, 10)}</div>
+  <div class="label" style="margin-bottom:12px">Last Played</div>
+  <div style="display:flex;justify-content:center">${art('NO SIGNAL', 300, 4, 'Nick Loder')}</div>
   <div style="display:flex;align-items:flex-end;margin-top:16px">
     <div><div class="display-26">NO SIGNAL</div>
       <div style="font-size:15px;color:var(--secondary);margin-top:2px">Nick Loder</div>
@@ -334,9 +333,9 @@ screen('phone-home', 'iPhone · Home', 'phone', `
     <div style="flex:1"></div>
     <div class="playbtn" style="width:52px;height:52px;font-size:17px">▶</div>
   </div>
-  <div class="label" style="margin-top:32px;margin-bottom:12px">Your Music</div>
+  <div class="label" style="margin-top:32px;margin-bottom:12px">Records</div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-    ${LIB.slice(1,3).map(t => `<div class="card">${art(t,'100%',6)}
+    ${LIB.slice(1,3).map(t => `<div class="card">${art(t,220,4,'Nick Loder')}
       <div class="t">${t}</div><div class="a">Nick Loder</div></div>`).join('')}
   </div>
 </div>
@@ -355,7 +354,7 @@ screen('phone-release', 'iPhone · Release', 'phone', `
 <div style="padding:0 16px;height:100%;overflow:hidden;display:flex;flex-direction:column">
   <div style="height:52px;display:flex;align-items:center;padding-left:4px;color:var(--secondary)">‹</div>
   <div style="display:flex;flex-direction:column;align-items:center;gap:16px;margin-top:8px">
-    ${art('NO SIGNAL', 260, 10)}
+    ${art('NO SIGNAL', 260, 4, 'Nick Loder')}
     <div style="text-align:center">
       <div class="label">Album</div>
       <div class="display-30" style="margin-top:4px">NO SIGNAL</div>
@@ -368,7 +367,7 @@ screen('phone-release', 'iPhone · Release', 'phone', `
     ${NO_SIGNAL.slice(0,6).map((t,i) => `<div style="display:flex;align-items:center;gap:12px;height:56px;border-bottom:1px solid var(--hairline)">
       <span class="num" style="width:26px">${i===5?'<span class="bars"><i style="height:4px"></i><i style="height:10px"></i><i style="height:6px"></i></span>':(i+1)}</span>
       <span class="name" style="flex:1;font-size:14px;${i===5?'color:var(--primary)':''}">${t}</span>
-      ${i===5?'<span class="pill">4 mixes</span><span style="color:var(--tertiary);padding:0 8px">⋯</span>':''}
+      ${i===5?'<span class="pill">4 mixes</span><span style="color:var(--tertiary);width:32px;text-align:center">⋯</span><span style="color:var(--tertiary);padding:0 8px">⋯</span>':''}
       <span class="dur">${DURS[i]}</span></div>`).join('')}
   </div>
 </div>`);
@@ -376,19 +375,23 @@ screen('phone-release', 'iPhone · Release', 'phone', `
 /* 7. Phone now playing — Stream */
 screen('phone-stream', 'iPhone · Now Playing (Stream)', 'phone', `
 <div style="height:100%;display:flex;flex-direction:column;align-items:center;padding:24px;gap:24px">
-  <div style="align-self:flex-start;color:var(--player-secondary);font-size:14px;padding:8px">⌄</div>
-  ${art('NO SIGNAL', 345, 10)}
-  <div style="text-align:center"><div class="np-title">Midnight</div>
+  <div style="align-self:stretch;display:flex;align-items:center;padding:8px">
+    <span style="color:var(--player-secondary);font-size:14px">⌄</span><div style="flex:1"></div>
+    <span style="color:var(--player-secondary);font-size:12px;font-weight:500;margin-right:16px">Up Next</span>
+    <span style="color:var(--player-secondary);font-size:12px;font-weight:500">Mixes</span></div>
+  ${art('NO SIGNAL', 320, 4, 'Nick Loder')}
+  <div style="text-align:center"><div class="label">NO SIGNAL</div>
+    <div class="np-title" style="margin-top:4px">Midnight</div>
     <div class="np-artist" style="margin-top:4px">Nick Loder</div></div>
   <div style="width:100%">${waveform(126, 0.34, 'var(--player-primary)', 'rgba(245,243,241,0.22)')}
     <div class="times"><span style="color:var(--player-secondary)">1:12</span>
       <span style="color:var(--player-secondary)">-2:30</span></div></div>
   <div class="transport" style="gap:24px;color:var(--player-primary)"><span style="opacity:0.42">⤨</span><span>◀◀</span>
     <span class="playbtn" style="width:52px;height:52px;font-size:18px">❚❚</span><span>▶▶</span><span style="opacity:0.42">⟳</span></div>
-  <div style="display:flex;gap:32px;color:var(--player-secondary);font-size:10px;text-align:center">
-    <div><div style="font-size:15px">▤</div>Versions</div><div><div style="font-size:15px">☰</div>Up Next</div></div>
   <div style="flex:1"></div>
-  <div class="modepicker"><span class="on">Stream</span><span>Gallery</span><span>Motion</span></div>
+  <div style="display:flex;gap:6px"><span style="width:4px;height:4px;border-radius:50%;background:rgba(255,255,255,0.7)"></span>
+    <span style="width:4px;height:4px;border-radius:50%;background:rgba(255,255,255,0.25)"></span>
+    <span style="width:4px;height:4px;border-radius:50%;background:rgba(255,255,255,0.25)"></span></div>
 </div>`);
 
 /* 8. Phone now playing — Motion */
@@ -408,9 +411,11 @@ screen('phone-motion', 'iPhone · Now Playing (Motion)', 'phone', `
     <div class="transport" style="gap:12px;color:#fff"><span>◀◀</span>
       <span class="playbtn" style="background:#fff;color:#111">❚❚</span><span>▶▶</span></div>
     <div style="flex:1"></div>
-    <span style="font-size:12px;font-weight:500;color:rgba(255,255,255,0.75)">Versions</span>
+    <span style="font-size:12px;font-weight:500;color:rgba(255,255,255,0.75)">Mixes</span>
   </div>
 </div>
-<div style="position:absolute;left:50%;transform:translateX(-50%);bottom:16px"><div class="modepicker">
-  <span>Stream</span><span>Gallery</span><span class="on">Motion</span></div></div>`);
+<div style="position:absolute;left:50%;transform:translateX(-50%);bottom:16px;display:flex;gap:6px">
+  <span style="width:4px;height:4px;border-radius:50%;background:rgba(255,255,255,0.25)"></span>
+  <span style="width:4px;height:4px;border-radius:50%;background:rgba(255,255,255,0.25)"></span>
+  <span style="width:4px;height:4px;border-radius:50%;background:rgba(255,255,255,0.7)"></span></div>`);
 </script>
