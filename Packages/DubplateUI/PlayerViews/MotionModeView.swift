@@ -11,7 +11,7 @@ import DubplateAudio
 public struct MotionModeView: View {
     private let player: PlayerController
     private let artwork: ArtworkAsset?
-    private let canvasURL: URL?
+    private let canvas: MotionSource?
     private let onShowVersions: (() -> Void)?
 
     @State private var controlsVisible = true
@@ -21,12 +21,12 @@ public struct MotionModeView: View {
     public init(
         player: PlayerController,
         artwork: ArtworkAsset?,
-        canvasURL: URL?,
+        canvas: MotionSource?,
         onShowVersions: (() -> Void)? = nil
     ) {
         self.player = player
         self.artwork = artwork
-        self.canvasURL = canvasURL
+        self.canvas = canvas
         self.onShowVersions = onShowVersions
     }
 
@@ -99,8 +99,12 @@ public struct MotionModeView: View {
 
     @ViewBuilder
     private var backdrop: some View {
-        if let canvasURL {
-            LoopingVideoView(url: canvasURL)
+        if let canvas {
+            LoopingVideoView(
+                url: canvas.url,
+                startTime: canvas.loopStart,
+                loopDuration: canvas.loopDuration
+            )
         } else {
             DriftingArtwork(asset: artwork, title: player.currentItem?.releaseTitle ?? "", isAnimating: !reduceMotion)
         }

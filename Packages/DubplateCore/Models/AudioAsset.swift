@@ -20,8 +20,6 @@ public final class AudioAsset {
     public var sourceFolder: String?
     /// Path relative to the media store root.
     public var relativePath: String = ""
-    /// Record name in the private CloudKit database, once uploaded.
-    public var cloudRecordName: String?
     public var duration: TimeInterval = 0
     public var sampleRate: Double = 0
     public var bitDepth: Int = 0

@@ -9,6 +9,12 @@ public struct ReleaseCard: View {
     private let release: Release
     private let isPlaying: Bool
     private let onPlay: (() -> Void)?
+    /// On a phone there is no hover, so the affordance has to be there.
+    #if os(iOS)
+    private let alwaysShowsPlay = true
+    #else
+    private let alwaysShowsPlay = false
+    #endif
 
     @State private var isHovering = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -25,7 +31,7 @@ public struct ReleaseCard: View {
                 ArtworkView(asset: release.artwork, title: release.title)
                     .shadow(color: .black.opacity(isHovering ? 0.28 : 0.16), radius: isHovering ? 18 : 10, y: isHovering ? 8 : 4)
 
-                if let onPlay, isHovering {
+                if let onPlay, isHovering || alwaysShowsPlay {
                     Button(action: onPlay) {
                         Image(systemName: "play.fill")
                             .font(.system(size: 15, weight: .semibold))
@@ -38,6 +44,7 @@ public struct ReleaseCard: View {
                     .padding(DubplateLayout.m)
                     .transition(.opacity.combined(with: .scale(scale: 0.9)))
                     .accessibilityLabel("Play \(release.title)")
+                    .opacity(alwaysShowsPlay && !isHovering ? 0.9 : 1)
                 }
             }
 

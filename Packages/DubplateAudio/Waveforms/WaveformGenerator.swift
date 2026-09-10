@@ -44,6 +44,7 @@ public struct WaveformGenerator: Sendable {
         var framesInBucket = 0
 
         while file.framePosition < totalFrames {
+            if Task.isCancelled { return Data() }
             try file.read(into: buffer, frameCount: chunkFrames)
             let frameCount = Int(buffer.frameLength)
             if frameCount == 0 { break }

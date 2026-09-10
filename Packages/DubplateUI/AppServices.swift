@@ -64,11 +64,17 @@ public final class AppServices {
             guard let self else { return }
             Task { await fetchAndResume(item) }
         }
+        library.artworkDidChange = { [weak self] _ in
+            guard let self else { return }
+            artwork.invalidateAll()
+            player.invalidateArtwork()
+        }
     }
 
     /// Fetches the one file playback is waiting on, then lets it continue.
     private func fetchAndResume(_ item: PlaybackQueueItem) async {
         guard sync.canDownloadNow(allowsCellular: settings.allowsCellularDownloads) else {
+            downloadBlockedByCellular = true
             player.abandonPendingItem()
             return
         }
@@ -134,6 +140,10 @@ public final class AppServices {
     // MARK: - Startup
 
     public func start() async {
+        // What is actually on this device is not stored and not synced, so it has to
+        // be established by looking — once, at launch, before anything asks.
+        MediaAvailability.refreshAll(in: container.mainContext, using: mediaStore)
+        NetworkPath.start()
         await sync.start()
         analyser.analysePending()
     }
@@ -260,6 +270,16 @@ public final class AppServices {
         Task { await sync.forget(assetIDs: removed) }
     }
 
+    /// A looping visual, with its trim, if the file is actually on this device.
+    public func motionSource(for asset: ArtworkAsset) -> MotionSource? {
+        guard mediaStore.exists(relativePath: asset.relativePath) else { return nil }
+        return MotionSource(
+            url: mediaStore.url(forRelativePath: asset.relativePath),
+            loopStart: asset.loopStart,
+            loopDuration: asset.loopDuration
+        )
+    }
+
     /// Total bytes a release would take to hold offline.
     public func downloadSize(of release: Release, currentVersionsOnly: Bool = false) -> Int64 {
         release.orderedTracks.reduce(0) { total, track in
@@ -275,23 +295,17 @@ public final class AppServices {
     /// fetching what is missing without being asked.
     ///
     /// This is what "I made it on the Mac and it was on my phone" has to mean.
+    /// Opens a release: repairs it after any merge and works out what is actually
+    /// on this device.
+    ///
+    /// Deliberately does *not* start downloading. Browsing ten records on a phone
+    /// must not pull ten albums onto it — that is the whole reason the bytes are
+    /// separate from the catalogue. Audio arrives when someone presses play, or
+    /// when they ask for the record to be held offline.
     public func open(release: Release) {
+        guard !release.isDeleted else { return }
         LibraryRepair.repair(release, in: container.mainContext)
         MediaAvailability.refresh(release, using: mediaStore)
-
-        let missing = MediaAvailability.missingAssetIDs(for: release, using: mediaStore)
-        guard !missing.isEmpty,
-              sync.canDownloadNow(allowsCellular: settings.allowsCellularDownloads)
-        else {
-            return
-        }
-        for track in release.orderedTracks {
-            track.currentAsset?.transferState = .downloading
-        }
-        Task {
-            await sync.download(assetIDs: missing)
-            MediaAvailability.refresh(release, using: mediaStore)
-        }
     }
 
     /// Frees the space a release takes on this device, leaving iCloud alone.

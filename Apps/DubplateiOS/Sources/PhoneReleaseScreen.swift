@@ -38,7 +38,8 @@ struct PhoneReleaseScreen: View {
             .padding(.bottom, 120)
         }
         .background(DubplateColor.ground)
-        .navigationTitle(release.title)
+        // No navigation title: the release name is the first thing in the content,
+        // and setting both prints it twice.
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { services.open(release: release) }
         .sheet(item: $versionsTrack) { track in
@@ -70,6 +71,9 @@ struct PhoneReleaseScreen: View {
                             track: track,
                             isCurrent: player.currentItem?.trackID == track.id,
                             isPlaying: player.currentItem?.trackID == track.id && player.isPlaying,
+                            playingVersionID: player.currentItem?.trackID == track.id
+                                ? player.currentItem?.versionID
+                                : nil,
                             onPlay: { services.play(release: release, startingAt: track) }
                         )
                         .contentShape(Rectangle())
@@ -138,7 +142,7 @@ struct DownloadButton: View {
                 Label(state.title, systemImage: state.symbol)
             }
             .buttonStyle(DubplateQuietButtonStyle())
-            .disabled(isWorking)
+            .disabled(isWorking || state == .onlyCopyHere)
 
             Text(state.detail(size: totalSize))
                 .font(DubplateType.metadata)
@@ -146,16 +150,20 @@ struct DownloadButton: View {
         }
     }
 
-    private enum State {
+    private enum State: Equatable {
         case downloaded
         case notDownloaded
         case partial
+        /// Nothing is in iCloud yet, so there is nothing to remove and nothing to
+        /// fetch — and removing would destroy the only copy.
+        case onlyCopyHere
 
         var title: String {
             switch self {
             case .downloaded: return "Remove Download"
             case .notDownloaded: return "Download Release"
             case .partial: return "Finish Downloading"
+            case .onlyCopyHere: return "Only Copy Is Here"
             }
         }
 
@@ -163,20 +171,28 @@ struct DownloadButton: View {
             switch self {
             case .downloaded: return "checkmark.circle"
             case .notDownloaded, .partial: return "arrow.down.circle"
+            case .onlyCopyHere: return "exclamationmark.circle"
             }
         }
 
         func detail(size: Int64) -> String {
             switch self {
-            case .downloaded: return "\(Formatting.fileSize(size)) on this iPhone. Your iCloud copy stays put."
-            case .notDownloaded: return "\(Formatting.fileSize(size)) — keeps playing with no signal."
-            case .partial: return "Some tracks are still in iCloud."
+            case .downloaded:
+                return "\(Formatting.fileSize(size)) on this iPhone, every mix. Your iCloud copy stays put."
+            case .notDownloaded:
+                return "\(Formatting.fileSize(size)) — every mix, so you can compare them with no signal."
+            case .partial:
+                return "Some mixes are still in iCloud."
+            case .onlyCopyHere:
+                return "This hasn’t finished uploading. Dubplate won’t remove the only copy of a mix."
             }
         }
     }
 
+    /// Every version, not only the current one — comparing two mixes away from the
+    /// studio is most of what the phone is for.
     private var assets: [AudioAsset] {
-        release.orderedTracks.compactMap(\.currentAsset)
+        release.orderedTracks.flatMap { ($0.versions ?? []).compactMap(\.audioAsset) }
     }
 
     private var totalSize: Int64 {
@@ -186,7 +202,9 @@ struct DownloadButton: View {
     private var downloadState: State {
         let states = assets.map(\.availability)
         guard !states.isEmpty else { return .notDownloaded }
-        if states.allSatisfy({ $0.isPlayableNow }) { return .downloaded }
+        if states.allSatisfy({ $0.isPlayableNow }) {
+            return services.sync.isEnabled && services.sync.accountState.canSync ? .downloaded : .onlyCopyHere
+        }
         if states.contains(where: { $0.isPlayableNow }) { return .partial }
         return .notDownloaded
     }
@@ -199,6 +217,8 @@ struct DownloadButton: View {
             await services.removeDownload(for: release)
         case .notDownloaded, .partial:
             await services.download(release: release)
+        case .onlyCopyHere:
+            break
         }
     }
 }

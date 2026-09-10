@@ -62,7 +62,11 @@ public struct LoudnessAnalyzer: Sendable {
         let stepFrames = max(1, blockFrames / 4)
         guard blockFrames > 0 else { return -.infinity }
 
+        // A running sum rather than a reduce over the whole window on every step:
+        // the window is 19,200 frames at 48 kHz and the step is 4,800, so re-summing
+        // added four extra additions per input sample on top of the filters.
         var ring = [Double](repeating: 0, count: blockFrames)
+        var ringSum = 0.0
         var ringFilled = 0
         var ringIndex = 0
         var framesSinceBlock = 0
@@ -74,6 +78,7 @@ public struct LoudnessAnalyzer: Sendable {
         }
 
         while file.framePosition < file.length {
+            if Task.isCancelled { return -.infinity }
             try file.read(into: buffer, frameCount: chunkFrames)
             let frameCount = Int(buffer.frameLength)
             if frameCount == 0 { break }
@@ -89,6 +94,7 @@ public struct LoudnessAnalyzer: Sendable {
                     // measure surround material, so no other weights apply.
                     weightedSquareSum += filtered * filtered
                 }
+                ringSum += weightedSquareSum - ring[ringIndex]
                 ring[ringIndex] = weightedSquareSum
                 ringIndex = (ringIndex + 1) % blockFrames
                 ringFilled = min(ringFilled + 1, blockFrames)
@@ -96,7 +102,7 @@ public struct LoudnessAnalyzer: Sendable {
 
                 if ringFilled == blockFrames, framesSinceBlock >= stepFrames {
                     framesSinceBlock = 0
-                    let mean = ring.reduce(0, +) / Double(blockFrames)
+                    let mean = ringSum / Double(blockFrames)
                     if mean > 0 {
                         blockLoudness.append(-0.691 + 10 * log10(mean))
                     }

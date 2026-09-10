@@ -20,6 +20,9 @@ public final class Release {
     public var createdAt: Date = Date.distantPast
     public var updatedAt: Date = Date.distantPast
     public var lastPlayedAt: Date?
+    /// When a merge was last tidied up. Separate from `updatedAt` so that repairing
+    /// a record does not move it to the top of the library.
+    public var repairedAt: Date?
 
     /// Track identifiers in listening order. May contain identifiers for tracks that
     /// have not synced yet, and may omit tracks that arrived from another device;
@@ -96,8 +99,13 @@ public final class Release {
     }
 
     /// Sum of the durations of the current version of every track.
+    ///
+    /// Denormalised, because a grid of a hundred covers reaching for this would
+    /// fault in every track of every release to draw a subtitle.
+    public var cachedDuration: TimeInterval = 0
+
     public var totalDuration: TimeInterval {
-        orderedTracks.reduce(0) { $0 + $1.duration }
+        cachedDuration > 0 ? cachedDuration : (tracks ?? []).reduce(0) { $0 + $1.duration }
     }
 
     /// "Album · 9 tracks" — the line under a release everywhere in the app.
@@ -114,7 +122,13 @@ public final class Release {
             track.trackNumber = index + 1
             track.updatedAt = date
         }
+        cachedDuration = ordered.reduce(0) { $0 + $1.duration }
         updatedAt = date
+    }
+
+    /// Re-adds up the run time after a version change, without reordering anything.
+    public func refreshDuration() {
+        cachedDuration = orderedTracks.reduce(0) { $0 + $1.duration }
     }
 
     /// Brings `trackOrder` back in line with the relationship after tracks are

@@ -90,4 +90,32 @@ final class MediaStoreTests: XCTestCase {
     func testEmptyRelativePathIsNeverConsideredPresent() {
         XCTAssertFalse(store.exists(relativePath: ""))
     }
+
+    // MARK: - Folder drops
+
+    /// "Drop a folder of bounces here" is the first instruction the product gives.
+    func testDroppingAFolderFindsTheFilesInside() throws {
+        let folder = URL.temporaryDirectory.appending(path: "NO SIGNAL-\(UUID().uuidString)")
+        let inner = folder.appending(path: "Bounces")
+        try FileManager.default.createDirectory(at: inner, withIntermediateDirectories: true)
+        for name in ["02 Dust.wav", "01 Intro.wav", "cover.jpg", "notes.txt"] {
+            try Data([0, 1]).write(to: inner.appending(path: name))
+        }
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let found = DroppedFiles.expand([folder]).map(\.lastPathComponent)
+
+        XCTAssertEqual(found, ["01 Intro.wav", "02 Dust.wav", "cover.jpg"])
+        XCTAssertFalse(found.contains("notes.txt"))
+    }
+
+    /// A Logic project is a directory on disk and emphatically not eight tracks.
+    func testPackagesAreNotWalkedInto() throws {
+        let project = URL.temporaryDirectory.appending(path: "Session-\(UUID().uuidString).logicx")
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        try Data([0]).write(to: project.appending(path: "audio.wav"))
+        defer { try? FileManager.default.removeItem(at: project) }
+
+        XCTAssertTrue(DroppedFiles.expand([project]).isEmpty)
+    }
 }

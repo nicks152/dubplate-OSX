@@ -116,6 +116,9 @@ extension LibraryStore {
         for planned in plan.newTracks {
             var createdTrack: Track?
             for candidate in planned.candidates {
+                // A merge from another device can delete the release mid-import;
+                // touching an invalidated model is a trap, not an error.
+                if let release, release.isDeleted { break }
                 setImportProgress(
                     ImportProgress(completed: completed, total: total, currentFilename: candidate.filename)
                 )
@@ -145,13 +148,14 @@ extension LibraryStore {
                 ImportProgress(completed: completed, total: total, currentFilename: planned.candidate.filename)
             )
             completed += 1
-            guard let track = track(id: planned.match.trackID) else { continue }
+            // Re-fetched rather than captured, for the same reason.
+            guard let track = track(id: planned.match.trackID), !track.isDeleted else { continue }
             guard let ingested = await ingest(planned.candidate, target: track, into: &outcome) else { continue }
             let version = addVersion(from: ingested, to: track)
             outcome.addedVersions.append(version.id)
         }
 
-        if let release {
+        if let release, !release.isDeleted {
             for candidate in plan.artwork {
                 setImportProgress(
                     ImportProgress(completed: completed, total: total, currentFilename: candidate.filename)
@@ -185,6 +189,7 @@ extension LibraryStore {
         let candidate = ImportCandidate.make(url: url, dropIndex: 0)
         setImportProgress(ImportProgress(completed: 0, total: 1, currentFilename: candidate.filename))
         defer { setImportProgress(nil) }
+        guard !track.isDeleted else { return outcome }
 
         switch choice {
         case .createNewTrack:
@@ -244,6 +249,7 @@ extension LibraryStore {
             release.artwork = asset
             release.updatedAt = Date()
             save()
+            artworkDidChange?(release.id)
         } catch let error as DubplateError {
             lastError = error
         } catch {

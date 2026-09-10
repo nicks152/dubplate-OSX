@@ -47,9 +47,16 @@ public struct TrackInspectorView: View {
             field("Artist", text: $track.artistName)
             field("Featured", text: Binding($track.featuredArtists) ?? .constant(""), placeholder: "Nobody")
 
-            HStack(spacing: DubplateLayout.l) {
-                numberField("Track", value: $track.trackNumber)
-                numberField("Disc", value: $track.discNumber)
+            HStack(alignment: .top, spacing: DubplateLayout.xl) {
+                // Read-only: the sequence is the drag list, and a field that looks
+                // editable but is renumbered by every repair is worse than no field.
+                VStack(alignment: .leading, spacing: DubplateLayout.xs) {
+                    Text("Track").dubplateLabelStyle()
+                    Text("\(track.trackNumber) of \(track.release?.trackCount ?? 1)")
+                        .font(DubplateType.metadata)
+                        .foregroundStyle(DubplateColor.secondaryText)
+                        .help("Drag the track list to change the running order")
+                }
                 VStack(alignment: .leading, spacing: DubplateLayout.xs) {
                     Text("Explicit").dubplateLabelStyle()
                     Toggle("", isOn: $track.explicitFlag)
@@ -57,14 +64,15 @@ public struct TrackInspectorView: View {
                         .toggleStyle(.switch)
                         .onChange(of: track.explicitFlag) { _, _ in onCommit() }
                 }
+                Spacer(minLength: 0)
             }
         }
     }
 
     private var versionSummary: some View {
         VStack(alignment: .leading, spacing: DubplateLayout.s) {
-            SectionHeader("Current Version") {
-                Button("All Versions", action: onShowVersions)
+            SectionHeader("Current Mix") {
+                Button("All Mixes", action: onShowVersions)
                     .buttonStyle(.plain)
                     .font(DubplateType.metadata)
                     .foregroundStyle(DubplateColor.secondaryText)
@@ -74,7 +82,7 @@ public struct TrackInspectorView: View {
                     .font(DubplateType.rowTitle)
                     .foregroundStyle(DubplateColor.primaryText)
                     .lineLimit(2)
-                Text("\(track.versionCount) version\(track.versionCount == 1 ? "" : "s")")
+                Text("\(track.versionCount) mix\(track.versionCount == 1 ? "" : "es") · \(Formatting.relativeDate(current.createdAt))")
                     .font(DubplateType.metadata)
                     .foregroundStyle(DubplateColor.tertiaryText)
             } else {
@@ -89,7 +97,7 @@ public struct TrackInspectorView: View {
         VStack(alignment: .leading, spacing: DubplateLayout.s) {
             SectionHeader("File")
             if let asset = track.currentAsset {
-                Text(asset.originalFilename)
+                Text(asset.sourceFolder.map { "\($0)/\(asset.originalFilename)" } ?? asset.originalFilename)
                     .font(DubplateType.metadata)
                     .foregroundStyle(DubplateColor.secondaryText)
                     .lineLimit(2)
@@ -135,17 +143,4 @@ public struct TrackInspectorView: View {
         }
     }
 
-    private func numberField(_ label: String, value: Binding<Int>) -> some View {
-        VStack(alignment: .leading, spacing: DubplateLayout.xs) {
-            Text(label).dubplateLabelStyle()
-            TextField("", value: value, format: .number)
-                .textFieldStyle(.plain)
-                .font(DubplateType.metadata)
-                .frame(width: 48)
-                .padding(.vertical, DubplateLayout.s)
-                .padding(.horizontal, DubplateLayout.m)
-                .background(DubplateColor.sunken, in: RoundedRectangle(cornerRadius: DubplateLayout.controlRadius, style: .continuous))
-                .onSubmit(onCommit)
-        }
-    }
 }

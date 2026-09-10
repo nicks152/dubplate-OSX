@@ -193,10 +193,6 @@ public final class SyncCoordinator {
         await transferService.removeLocalCopies(assetIDs)
     }
 
-    public func cancelTransfers(assetIDs: [UUID]) async {
-        await transferService.cancel(assetIDs)
-    }
-
     /// Uploads anything this device has that iCloud does not.
     private func uploadAnythingOutstanding() async {
         let pending = await index.pendingUploads()

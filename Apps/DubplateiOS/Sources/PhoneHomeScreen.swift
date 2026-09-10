@@ -7,7 +7,6 @@ import DubplateUI
 struct PhoneHomeScreen: View {
     @Binding var path: NavigationPath
     @Binding var searchText: String
-    @Binding var isImporting: Bool
 
     @Environment(AppServices.self) private var services
     @Environment(LibraryStore.self) private var library
@@ -44,13 +43,12 @@ struct PhoneHomeScreen: View {
         .searchable(text: $searchText, prompt: "Releases, tracks, filenames")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button("Add Audio…", systemImage: "plus") { isImporting = true }
-                    NavigationLink("Settings") { PhoneSettingsScreen() }
+                NavigationLink {
+                    PhoneSettingsScreen()
                 } label: {
-                    Image(systemName: "ellipsis.circle")
+                    Image(systemName: "gearshape")
                 }
-                .accessibilityLabel("More")
+                .accessibilityLabel("Settings")
             }
         }
         .refreshable { await services.sync.syncNow() }

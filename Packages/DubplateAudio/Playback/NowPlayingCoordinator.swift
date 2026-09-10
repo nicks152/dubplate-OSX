@@ -146,7 +146,12 @@ public final class NowPlayingCoordinator {
         lastItemID = item.id
     }
 
-    /// Cheap update for scrubbing: rewrites only the moving values.
+    /// Republishes the position.
+    ///
+    /// Only on a state change or a seek — never on a timer. The system extrapolates
+    /// the playhead from the elapsed time and the playback rate, so rewriting the
+    /// whole dictionary five times a second is an XPC round trip to the media server
+    /// for nothing, several times a second, for the length of a record.
     public func updatePosition(elapsed: TimeInterval, isPlaying: Bool) {
         let center = MPNowPlayingInfoCenter.default()
         guard var info = center.nowPlayingInfo else { return }
@@ -174,5 +179,9 @@ public final class NowPlayingCoordinator {
     /// Drops cached artwork for a release whose cover changed.
     public func invalidateArtwork(releaseID: UUID) {
         artworkCache[releaseID] = nil
+    }
+
+    public func invalidateAllArtwork() {
+        artworkCache.removeAll()
     }
 }

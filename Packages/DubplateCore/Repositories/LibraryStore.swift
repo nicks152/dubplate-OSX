@@ -19,6 +19,9 @@ public final class LibraryStore {
     public var lastError: DubplateError?
     /// Non-nil while files are being brought in.
     public private(set) var importProgress: ImportProgress?
+    /// Called when a release's cover changes, so cached renditions — including the
+    /// one on the Lock Screen — can be thrown away.
+    public var artworkDidChange: ((UUID) -> Void)?
 
     public init(context: ModelContext, mediaStore: MediaStore, inspector: any AudioFileInspecting) {
         self.context = context
@@ -32,16 +35,18 @@ public final class LibraryStore {
         fetch(FetchDescriptor<Release>(sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]))
     }
 
-    public func releases(ofType type: ReleaseType) -> [Release] {
-        releases().filter { $0.releaseType == type }
+    /// Most recently played first, resolved in the fetch rather than in memory.
+    public func recentlyPlayedReleases(limit: Int = 12) -> [Release] {
+        var descriptor = FetchDescriptor<Release>(
+            predicate: #Predicate { $0.lastPlayedAt != nil },
+            sortBy: [SortDescriptor(\.lastPlayedAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = limit
+        return fetch(descriptor)
     }
 
     public func recentlyPlayed(limit: Int = 12) -> [Release] {
-        releases()
-            .filter { $0.lastPlayedAt != nil }
-            .sorted { ($0.lastPlayedAt ?? .distantPast) > ($1.lastPlayedAt ?? .distantPast) }
-            .prefix(limit)
-            .map { $0 }
+        recentlyPlayedReleases(limit: limit)
     }
 
     public func release(id: UUID) -> Release? {
@@ -136,19 +141,20 @@ public final class LibraryStore {
     /// get their own unreleased music out of iCloud from inside the application.
     @discardableResult
     public func delete(release: Release) -> [UUID] {
-        var removed: [UUID] = []
+        // Work out what to remove and what path it lives at, delete the rows, save,
+        // and only then touch the disk. Removing bytes first and then failing to
+        // save leaves a row pointing at nothing.
+        var doomed: [(id: UUID, path: String)] = []
         for track in release.orderedTracks {
-            removed.append(contentsOf: deleteMedia(for: track))
+            doomed.append(contentsOf: mediaToRemove(for: track))
         }
-        if let artwork = release.artwork, deleteMedia(for: artwork) {
-            removed.append(artwork.id)
-        }
-        if let motion = release.animatedArtwork, deleteMedia(for: motion) {
-            removed.append(motion.id)
-        }
+        if let artwork = release.artwork { doomed.append((artwork.id, artwork.relativePath)) }
+        if let motion = release.animatedArtwork { doomed.append((motion.id, motion.relativePath)) }
+
         context.delete(release)
-        save()
-        return removed
+        guard commit() else { return [] }
+        removeFiles(doomed)
+        return doomed.map(\.id)
     }
 
     public func markPlayed(release: Release, at date: Date = Date()) {
@@ -175,11 +181,12 @@ public final class LibraryStore {
     @discardableResult
     public func delete(track: Track) -> [UUID] {
         let release = track.release
-        let removed = deleteMedia(for: track)
+        let doomed = mediaToRemove(for: track)
         context.delete(track)
         release?.normalizeOrder()
-        save()
-        return removed
+        guard commit() else { return [] }
+        removeFiles(doomed)
+        return doomed.map(\.id)
     }
 
     /// Takes a track off a record without destroying anything: it goes back to the
@@ -226,6 +233,7 @@ public final class LibraryStore {
 
     public func makeCurrent(version: TrackVersion, of track: Track) {
         track.makeCurrent(version)
+        track.release?.refreshDuration()
         track.release?.updatedAt = Date()
         save()
         Log.library.info("Current version of \(track.displayTitle, privacy: .public) is now \(version.shortName, privacy: .public)")
@@ -251,8 +259,12 @@ public final class LibraryStore {
             return
         }
         let wasCurrent = track.currentVersionID == version.id
+        var doomed: [(id: UUID, path: String)] = []
         if let asset = version.audioAsset {
-            deleteMedia(for: asset, excluding: version)
+            let sharedElsewhere = (asset.versions ?? []).contains { $0.id != version.id }
+            if !sharedElsewhere {
+                doomed.append((asset.id, asset.relativePath))
+            }
         }
         context.delete(version)
         if wasCurrent {
@@ -262,57 +274,62 @@ public final class LibraryStore {
             track.duration = next?.audioAsset?.duration ?? 0
         }
         track.updatedAt = Date()
-        save()
+        if commit() {
+            removeFiles(doomed)
+        }
     }
 
     // MARK: - Media cleanup
 
-    @discardableResult
-    private func deleteMedia(for track: Track) -> [UUID] {
-        var removed: [UUID] = []
+    /// The files a track owns outright.
+    ///
+    /// An asset another version still points at is left alone: the same master can
+    /// sit on a single and on the album, and deleting one record must not silence
+    /// the other.
+    private func mediaToRemove(for track: Track) -> [(id: UUID, path: String)] {
+        var doomed: [(id: UUID, path: String)] = []
+        let ownVersionIDs = Set((track.versions ?? []).map(\.id))
         for version in track.versions ?? [] {
-            if let asset = version.audioAsset, deleteMedia(for: asset, excluding: version) {
-                removed.append(asset.id)
+            guard let asset = version.audioAsset else { continue }
+            let sharedElsewhere = (asset.versions ?? []).contains { !ownVersionIDs.contains($0.id) }
+            if sharedElsewhere {
+                Log.media.info("Keeping shared media still used by another release")
+                continue
+            }
+            doomed.append((asset.id, asset.relativePath))
+        }
+        if let canvas = track.canvas {
+            doomed.append((canvas.id, canvas.relativePath))
+        }
+        return doomed
+    }
+
+    private func removeFiles(_ doomed: [(id: UUID, path: String)]) {
+        let paths = doomed.map(\.path)
+        Task { [ingestor] in
+            for path in paths {
+                await ingestor.removeMedia(atRelativePath: path)
             }
         }
-        if let canvas = track.canvas, deleteMedia(for: canvas) {
-            removed.append(canvas.id)
-        }
-        return removed
     }
 
-    /// Removes the file behind an asset — unless another version still points at it.
-    /// The same master can appear on a single and on the album; deleting one record
-    /// must not silence the other.
+    /// Saves, and says whether it worked.
     @discardableResult
-    private func deleteMedia(for asset: AudioAsset, excluding version: TrackVersion?) -> Bool {
-        let versionID = version?.id
-        let othersRemain = (asset.versions ?? []).contains { $0.id != versionID }
-        guard !othersRemain else {
-            Log.media.info("Keeping shared media still used by another version")
+    private func commit() -> Bool {
+        do {
+            try context.save()
+            return true
+        } catch {
+            Log.library.error("Save failed: \(String(describing: error))")
+            lastError = DubplateError(.unknown, underlying: error)
             return false
         }
-        let path = asset.relativePath
-        Task { await ingestor.removeMedia(atRelativePath: path) }
-        return true
-    }
-
-    @discardableResult
-    private func deleteMedia(for asset: ArtworkAsset) -> Bool {
-        let path = asset.relativePath
-        Task { await ingestor.removeMedia(atRelativePath: path) }
-        return true
     }
 
     // MARK: - Saving
 
     public func save() {
-        do {
-            try context.save()
-        } catch {
-            Log.library.error("Save failed: \(String(describing: error))")
-            lastError = DubplateError(.unknown, underlying: error)
-        }
+        commit()
     }
 
     func setImportProgress(_ progress: ImportProgress?) {

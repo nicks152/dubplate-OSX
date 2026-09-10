@@ -62,18 +62,25 @@ struct MacRootView: View {
             )
         }
         .overlay(alignment: .bottom) {
-            if let error = library.lastError ?? player.lastError ?? services.startupNotice {
-                ErrorBanner(error: error) {
-                    library.lastError = nil
-                    player.clearError()
-                    services.dismissStartupNotice()
+            VStack(spacing: DubplateLayout.s) {
+                if let summary = services.lastImportSummary {
+                    Toast(message: summary) { services.clearImportSummary() }
                 }
-                .padding(DubplateLayout.xl)
-                .padding(.bottom, 60)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                if let error = visibleError {
+                    ErrorBanner(error: error) {
+                        library.lastError = nil
+                        player.clearError()
+                        services.sync.clearError()
+                        services.dismissStartupNotice()
+                    }
+                }
             }
+            .padding(DubplateLayout.xl)
+            .padding(.bottom, 60)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
         }
         .animation(DubplateMotion.standard, value: library.lastError?.id)
+        .animation(DubplateMotion.standard, value: services.lastImportSummary)
         .sheet(isPresented: $isShowingNewRelease) {
             NewReleaseSheet(
                 defaultArtistName: library.defaultArtistName,
@@ -88,7 +95,7 @@ struct MacRootView: View {
             DevicePreviewView(
                 player: player,
                 artwork: currentArtwork,
-                canvasURL: currentCanvasURL,
+                canvas: currentCanvas,
                 mode: $previewMode
             )
             .frame(minWidth: 520, minHeight: 900)
@@ -147,14 +154,23 @@ struct MacRootView: View {
         }
     }
 
+    private var visibleError: DubplateError? {
+        library.lastError ?? player.lastError ?? services.sync.lastError ?? services.startupNotice
+    }
+
     private var currentArtwork: ArtworkAsset? {
         guard let releaseID = player.currentItem?.releaseID else { return nil }
         return library.release(id: releaseID)?.artwork
     }
 
-    private var currentCanvasURL: URL? {
-        guard let path = player.currentItem?.canvasRelativePath else { return nil }
-        return services.mediaStore.url(forRelativePath: path)
+    private var currentCanvas: MotionSource? {
+        guard let trackID = player.currentItem?.trackID,
+              let track = library.track(id: trackID)
+        else {
+            return nil
+        }
+        if let canvas = track.canvas { return services.motionSource(for: canvas) }
+        return track.release?.animatedArtwork.flatMap { services.motionSource(for: $0) }
     }
 
     private func create(_ result: NewReleaseSheet.Result) async {
@@ -168,7 +184,8 @@ struct MacRootView: View {
         }
         if !result.audioURLs.isEmpty {
             let plan = library.plan(for: result.audioURLs, in: release)
-            await library.apply(plan, to: release)
+            let outcome = await library.apply(plan, to: release)
+            services.report(outcome)
         }
         await services.registerNewMedia(in: release)
         section = .release(release.id)

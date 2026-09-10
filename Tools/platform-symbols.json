@@ -168,7 +168,9 @@
     "Context",
     "AnyClass",
     "StaticString",
-    "UInt8Array"
+    "UInt8Array",
+    "SystemRandomNumberGenerator",
+    "NSLock"
   ],
   "foundation": [
     "AttributedString",

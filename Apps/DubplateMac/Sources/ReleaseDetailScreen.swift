@@ -6,9 +6,13 @@ import DubplateUI
 
 /// A record, open.
 ///
-/// Header, sequence, and — when a track is selected — the inspector. Bounces get
-/// dropped anywhere on this screen: onto a track to make a new version of it, onto
-/// the empty space to add to the record.
+/// Header, sequence, and an inspector that changes with what is selected. Bounces
+/// get dropped anywhere: onto a track to make a new mix of it, onto the empty space
+/// to add to the record, onto the artwork to change the cover.
+///
+/// The version list lives in the inspector rather than behind a sheet, because
+/// comparing two mixes means pausing and scrubbing while you do it — and a modal
+/// puts the transport out of reach at exactly the wrong moment.
 struct ReleaseDetailScreen: View {
     let release: Release
 
@@ -17,27 +21,34 @@ struct ReleaseDetailScreen: View {
     @Environment(PlayerController.self) private var player
 
     @State private var selectedTrackID: UUID?
+    @State private var inspector: InspectorMode = .track
     @State private var isTargeted = false
-    @State private var pendingPlan: ImportPlan?
-    @State private var pendingDrop: (track: Track, url: URL, match: VersionMatch?)?
-    @State private var versionsTrack: Track?
+    @State private var pendingPlan: IdentifiedPlan?
+    @State private var pendingDrop: PendingTrackDrop?
+    @State private var pendingArtwork: URL?
+    @State private var trackToDelete: Track?
+    @State private var renamingVersion: TrackVersion?
+    @State private var annotatingVersion: TrackVersion?
+    @State private var draftText = ""
     @State private var isImporting = false
     @State private var isChoosingArtwork = false
+
+    private enum InspectorMode {
+        case track
+        case versions
+    }
 
     var body: some View {
         HSplitView {
             main
             if let track = selectedTrack {
-                TrackInspectorView(
-                    track: track,
-                    onCommit: { library.save() },
-                    onShowVersions: { versionsTrack = track }
-                )
-                .frame(minWidth: 280, idealWidth: 320, maxWidth: 420)
-                .transition(.move(edge: .trailing))
+                inspectorPane(for: track)
+                    .frame(minWidth: 300, idealWidth: 340, maxWidth: 460)
+                    .transition(.move(edge: .trailing))
             }
         }
         .animation(DubplateMotion.standard, value: selectedTrackID)
+        .animation(DubplateMotion.quick, value: inspector)
         .background(DubplateColor.ground)
         .onAppear { services.open(release: release) }
         .dropDestination(for: URL.self) { urls, _ in
@@ -45,7 +56,7 @@ struct ReleaseDetailScreen: View {
         } isTargeted: { isTargeted = $0 }
         .overlay {
             if isTargeted {
-                DropOverlay(message: "Add to \(release.title)")
+                DropOverlay(message: "Add to \(release.title.isEmpty ? "this release" : release.title)")
             }
         }
         .overlay(alignment: .top) {
@@ -54,7 +65,7 @@ struct ReleaseDetailScreen: View {
                     .padding(DubplateLayout.l)
             }
         }
-        .sheet(item: Binding(get: { pendingPlan.map(IdentifiedPlan.init) }, set: { _ in pendingPlan = nil })) { wrapper in
+        .sheet(item: $pendingPlan) { wrapper in
             ImportPlanSheet(
                 plan: wrapper.plan,
                 releaseTitle: release.title,
@@ -65,26 +76,70 @@ struct ReleaseDetailScreen: View {
                 }
             )
         }
-        .sheet(item: Binding(get: { versionsTrack }, set: { versionsTrack = $0 })) { track in
-            VersionsSheet(track: track) { versionsTrack = nil }
+        .sheet(item: $pendingDrop) { drop in
+            TrackDropSheet(
+                filename: drop.summary,
+                track: drop.track,
+                suggestion: drop.match,
+                onCancel: { pendingDrop = nil },
+                onChoose: { choice in
+                    pendingDrop = nil
+                    Task { await applyDrop(choice: choice, urls: drop.urls, track: drop.track) }
+                }
+            )
         }
-        .sheet(isPresented: Binding(get: { pendingDrop != nil }, set: { if !$0 { pendingDrop = nil } })) {
-            if let drop = pendingDrop {
-                TrackDropSheet(
-                    filename: drop.url.lastPathComponent,
-                    track: drop.track,
-                    suggestion: drop.match,
-                    onCancel: { pendingDrop = nil },
-                    onChoose: { choice in
-                        pendingDrop = nil
-                        Task { await applyDrop(choice: choice, url: drop.url, track: drop.track) }
-                    }
-                )
+        .confirmationDialog(
+            artworkPrompt,
+            isPresented: Binding(get: { pendingArtwork != nil }, set: { if !$0 { pendingArtwork = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button("Replace Cover") {
+                if let url = pendingArtwork { Task { await setArtwork(url) } }
+                pendingArtwork = nil
             }
+            Button("Cancel", role: .cancel) { pendingArtwork = nil }
+        } message: {
+            Text("The cover you have now is deleted from this Mac.")
+        }
+        .confirmationDialog(
+            deleteTrackPrompt,
+            isPresented: Binding(get: { trackToDelete != nil }, set: { if !$0 { trackToDelete = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button("Delete Track", role: .destructive) {
+                if let track = trackToDelete {
+                    if selectedTrackID == track.id { selectedTrackID = nil }
+                    services.delete(track: track)
+                }
+                trackToDelete = nil
+            }
+            Button("Cancel", role: .cancel) { trackToDelete = nil }
+        } message: {
+            Text("Every mix of it leaves this Mac and your iCloud. This can’t be undone.")
+        }
+        .alert("Rename Mix", isPresented: Binding(get: { renamingVersion != nil }, set: { if !$0 { renamingVersion = nil } })) {
+            TextField("Label", text: $draftText)
+            Button("Cancel", role: .cancel) { renamingVersion = nil }
+            Button("Save") {
+                if let version = renamingVersion { library.rename(version: version, to: draftText) }
+                renamingVersion = nil
+            }
+        } message: {
+            Text("What do you call this mix?")
+        }
+        .alert("Note", isPresented: Binding(get: { annotatingVersion != nil }, set: { if !$0 { annotatingVersion = nil } })) {
+            TextField("Too much sub in the second chorus…", text: $draftText)
+            Button("Cancel", role: .cancel) { annotatingVersion = nil }
+            Button("Save") {
+                if let version = annotatingVersion { library.annotate(version: version, notes: draftText) }
+                annotatingVersion = nil
+            }
+        } message: {
+            Text("Kept against this mix, so you know why you moved on from it.")
         }
         .fileImporter(
             isPresented: $isImporting,
-            allowedContentTypes: [.audio, .mp3, .wav, .aiff, .mpeg4Audio],
+            allowedContentTypes: [.audio, .folder],
             allowsMultipleSelection: true
         ) { result in
             if case .success(let urls) = result {
@@ -97,11 +152,7 @@ struct ReleaseDetailScreen: View {
             allowsMultipleSelection: false
         ) { result in
             if case .success(let urls) = result, let url = urls.first {
-                Task {
-                    await library.setArtwork(from: url, for: release)
-                    services.artwork.invalidate(relativePath: release.artwork?.relativePath ?? "")
-                    await services.registerNewMedia(in: release)
-                }
+                Task { await setArtwork(url) }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .dubplateImportAudio)) { _ in
@@ -114,16 +165,24 @@ struct ReleaseDetailScreen: View {
             ReleaseHeaderView(
                 release: release,
                 layout: .horizontal,
+                isEditable: true,
                 onPlay: { services.play(release: release) },
                 onShuffle: { services.play(release: release, shuffled: true) },
-                onEditArtwork: { isChoosingArtwork = true }
+                onEditArtwork: { isChoosingArtwork = true },
+                onCommit: { library.save() }
             )
             .padding(DubplateLayout.xxl)
+
+            if let warning = sampleRateWarning {
+                SequenceWarning(message: warning)
+                    .padding(.horizontal, DubplateLayout.xxl)
+                    .padding(.bottom, DubplateLayout.m)
+            }
 
             if release.trackCount == 0 {
                 EmptyState(
                     headline: "No tracks yet",
-                    message: "Drag your bounces in. Dubplate will read the numbers in the filenames and sequence them for you.",
+                    message: "Drag your bounce folder in. Dubplate reads the numbers in the filenames and sequences it for you.",
                     actionTitle: "Import Audio…",
                     action: { isImporting = true }
                 )
@@ -132,23 +191,19 @@ struct ReleaseDetailScreen: View {
                     tracks: release.orderedTracks,
                     currentTrackID: player.currentItem?.trackID,
                     isPlaying: player.isPlaying,
+                    playingVersionID: player.currentItem?.versionID,
                     selection: $selectedTrackID,
                     onPlay: { services.play(release: release, startingAt: $0) },
                     onMove: { offsets, destination in
                         library.move(in: release, fromOffsets: offsets, toOffset: destination)
                     },
-                    onDropAudio: { track, urls in
-                        guard let url = urls.first else { return }
-                        pendingDrop = (
-                            track,
-                            url,
-                            VersionMatcher.match(
-                                filename: url.lastPathComponent,
-                                among: library.summaries(for: release)
-                            )
-                        )
+                    onDropAudio: { track, urls in receiveDrop(urls, on: track) },
+                    onShowVersions: { track in
+                        selectedTrackID = track.id
+                        inspector = .versions
                     },
-                    onDelete: { library.delete(track: $0) }
+                    onRemove: { library.removeFromRelease(track: $0) },
+                    onDelete: { trackToDelete = $0 }
                 )
                 .frame(maxHeight: .infinity)
             }
@@ -156,46 +211,192 @@ struct ReleaseDetailScreen: View {
         .frame(minWidth: 520)
     }
 
+    @ViewBuilder
+    private func inspectorPane(for track: Track) -> some View {
+        VStack(spacing: 0) {
+            Picker("", selection: $inspector) {
+                Text("Track").tag(InspectorMode.track)
+                Text("Mixes (\(track.versionCount))").tag(InspectorMode.versions)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(DubplateLayout.m)
+
+            Divider().overlay(DubplateColor.hairline)
+
+            switch inspector {
+            case .track:
+                TrackInspectorView(
+                    track: track,
+                    onCommit: { library.save() },
+                    onShowVersions: { inspector = .versions }
+                )
+            case .versions:
+                ScrollView {
+                    VersionListView(
+                        track: track,
+                        playingVersionID: player.currentItem?.versionID,
+                        onPlay: { services.audition(version: $0, of: track) },
+                        onMakeCurrent: { version in
+                            library.makeCurrent(version: version, of: track)
+                            services.refreshQueueEntry(for: track)
+                        },
+                        onRename: { version in
+                            draftText = version.label ?? ""
+                            renamingVersion = version
+                        },
+                        onAnnotate: { version in
+                            draftText = version.notes ?? ""
+                            annotatingVersion = version
+                        },
+                        onDelete: { library.delete(version: $0) },
+                        onReveal: { version in
+                            guard let path = version.audioAsset?.relativePath else { return }
+                            RevealInFinder.reveal(services.mediaStore.url(forRelativePath: path))
+                        }
+                    )
+                    .padding(DubplateLayout.l)
+                }
+                .background(DubplateColor.raised)
+            }
+        }
+        .background(DubplateColor.raised)
+    }
+
     private var selectedTrack: Track? {
         guard let selectedTrackID else { return nil }
         return release.orderedTracks.first { $0.id == selectedTrackID }
     }
 
-    private func handleDrop(_ urls: [URL]) -> Bool {
-        let images = urls.filter { FilenameParser.isImage($0.lastPathComponent) }
-        let audio = urls.filter { FilenameParser.isAudio($0.lastPathComponent) }
-        guard !images.isEmpty || !audio.isEmpty else { return false }
+    /// The one pre-release problem a release simulator is uniquely able to catch.
+    private var sampleRateWarning: String? {
+        let tracks = release.orderedTracks
+        guard tracks.count > 1 else { return nil }
+        for index in 1..<tracks.count {
+            guard let previous = tracks[index - 1].currentAsset?.format,
+                  let current = tracks[index].currentAsset?.format,
+                  previous.isKnown, current.isKnown,
+                  !previous.isGaplessCompatible(with: current)
+            else {
+                continue
+            }
+            return "Track \(index + 1) is \(current.sampleRateSummary) after \(previous.sampleRateSummary). "
+                + "That join won’t be gapless — re-bounce it to match."
+        }
+        return nil
+    }
 
-        Task {
-            if let image = images.first {
-                await library.setArtwork(from: image, for: release)
-                services.artwork.invalidateAll()
+    private var artworkPrompt: String {
+        guard let url = pendingArtwork else { return "" }
+        return "Use “\(url.lastPathComponent)” as the cover?"
+    }
+
+    private var deleteTrackPrompt: String {
+        guard let track = trackToDelete else { return "" }
+        let mixes = track.versionCount
+        return "Delete “\(track.displayTitle)” and its \(mixes) mix\(mixes == 1 ? "" : "es")?"
+    }
+
+    // MARK: - Drops
+
+    private func receiveDrop(_ urls: [URL], on track: Track) {
+        let files = DroppedFiles.expand(urls)
+        if let video = files.first(where: { FilenameParser.isVideo($0.lastPathComponent) }) {
+            // A vertical loop dropped on a track is that track's canvas.
+            Task {
+                await library.setCanvas(from: video, for: track)
+                await services.registerNewMedia(in: release)
             }
-            if !audio.isEmpty {
-                let plan = library.plan(for: audio, in: release)
-                if ImportPlanSheet.requiresConfirmation(plan) {
-                    pendingPlan = plan
-                } else {
-                    await apply(plan)
-                }
+            return
+        }
+        let audio = files.filter { FilenameParser.isAudio($0.lastPathComponent) }
+        guard !audio.isEmpty else { return }
+
+        let match = VersionMatcher.match(
+            filename: audio[0].lastPathComponent,
+            among: library.summaries(for: release)
+        )
+        // The thing a producer does forty times a day should not cost a modal. When
+        // the bounce clearly belongs to the track it was dropped on, add it, make it
+        // current, and play it — the sheet is for the ambiguous case.
+        let isObvious = audio.count == 1 && (match?.trackID == track.id || match == nil)
+        if isObvious {
+            Task { await applyDrop(choice: .addAsNewVersion, urls: audio, track: track) }
+        } else {
+            pendingDrop = PendingTrackDrop(track: track, urls: audio, match: match)
+        }
+    }
+
+    private func handleDrop(_ urls: [URL]) -> Bool {
+        let files = DroppedFiles.expand(urls)
+        let images = files.filter { FilenameParser.isImage($0.lastPathComponent) }
+        let audio = files.filter { FilenameParser.isAudio($0.lastPathComponent) }
+        let videos = files.filter { FilenameParser.isVideo($0.lastPathComponent) }
+        guard !images.isEmpty || !audio.isEmpty || !videos.isEmpty else { return false }
+
+        if let image = images.first {
+            // Never silently: replacing a cover deletes the old file.
+            pendingArtwork = image
+        }
+        if !audio.isEmpty || !videos.isEmpty {
+            let plan = library.plan(for: audio + videos, in: release)
+            if ImportPlanSheet.requiresConfirmation(plan) {
+                pendingPlan = IdentifiedPlan(plan)
+            } else {
+                Task { await apply(plan) }
             }
-            await services.registerNewMedia(in: release)
         }
         return true
     }
 
     private func apply(_ plan: ImportPlan) async {
-        await library.apply(plan, to: release)
+        let outcome = await library.apply(plan, to: release)
+        services.report(outcome)
         await services.registerNewMedia(in: release)
         for track in release.orderedTracks {
             services.refreshQueueEntry(for: track)
         }
     }
 
-    private func applyDrop(choice: TrackDropChoice, url: URL, track: Track) async {
-        await library.apply(choice: choice, url: url, to: track)
+    private func applyDrop(choice: TrackDropChoice, urls: [URL], track: Track) async {
+        var outcome = ImportOutcome()
+        for url in urls {
+            let result = await library.apply(choice: choice, url: url, to: track)
+            outcome.createdTracks.append(contentsOf: result.createdTracks)
+            outcome.addedVersions.append(contentsOf: result.addedVersions)
+            outcome.duplicateFilenames.append(contentsOf: result.duplicateFilenames)
+            outcome.repairedFilenames.append(contentsOf: result.repairedFilenames)
+            outcome.failures.append(contentsOf: result.failures)
+        }
+        services.report(outcome, trackTitle: track.displayTitle)
         await services.registerNewMedia(in: release)
-        services.refreshQueueEntry(for: track)
+
+        // The sheet's own copy says the new mix starts playing, so it has to.
+        if let newest = track.currentVersion, !outcome.addedVersions.isEmpty {
+            services.audition(version: newest, of: track)
+        } else {
+            services.refreshQueueEntry(for: track)
+        }
+    }
+
+    private func setArtwork(_ url: URL) async {
+        await library.setArtwork(from: url, for: release)
+        services.artwork.invalidateAll()
+        await services.registerNewMedia(in: release)
+    }
+}
+
+/// One or more bounces waiting on a decision about one track.
+struct PendingTrackDrop: Identifiable {
+    let id = UUID()
+    let track: Track
+    let urls: [URL]
+    let match: VersionMatch?
+
+    var summary: String {
+        urls.count == 1
+            ? urls[0].lastPathComponent
+            : "\(urls.count) bounces"
     }
 }
 
@@ -206,6 +407,26 @@ struct IdentifiedPlan: Identifiable {
 
     init(_ plan: ImportPlan) {
         self.plan = plan
+    }
+}
+
+/// A quiet line above the sequence about something that will be audible.
+struct SequenceWarning: View {
+    let message: String
+
+    var body: some View {
+        HStack(spacing: DubplateLayout.s) {
+            Image(systemName: "waveform.badge.exclamationmark")
+                .font(.system(size: 12))
+            Text(message)
+                .font(DubplateType.metadata)
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(DubplateColor.secondaryText)
+        .padding(.horizontal, DubplateLayout.m)
+        .padding(.vertical, DubplateLayout.s)
+        .background(DubplateColor.sunken, in: RoundedRectangle(cornerRadius: DubplateLayout.controlRadius, style: .continuous))
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -233,71 +454,5 @@ struct ImportProgressBar: View {
         .overlay(Capsule().strokeBorder(DubplateColor.hairline))
         .shadow(color: .black.opacity(0.2), radius: 14, y: 6)
         .accessibilityLabel("Importing \(progress.currentFilename), \(progress.completed) of \(progress.total)")
-    }
-}
-
-/// The version list, as a sheet from the release page.
-struct VersionsSheet: View {
-    let track: Track
-    let onDismiss: () -> Void
-
-    @Environment(AppServices.self) private var services
-    @Environment(LibraryStore.self) private var library
-    @Environment(PlayerController.self) private var player
-    @State private var renaming: TrackVersion?
-    @State private var draftLabel = ""
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: DubplateLayout.xl) {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Versions").dubplateLabelStyle()
-                    Text(track.displayTitle)
-                        .dubplateDisplayStyle(size: 22)
-                        .foregroundStyle(DubplateColor.primaryText)
-                }
-                Spacer()
-                Button("Done", action: onDismiss)
-                    .buttonStyle(DubplateQuietButtonStyle())
-                    .keyboardShortcut(.defaultAction)
-            }
-
-            ScrollView {
-                VersionListView(
-                    track: track,
-                    playingVersionID: player.currentItem?.versionID,
-                    onPlay: { services.audition(version: $0, of: track) },
-                    onMakeCurrent: { version in
-                        library.makeCurrent(version: version, of: track)
-                        services.refreshQueueEntry(for: track)
-                    },
-                    onRename: { version in
-                        renaming = version
-                        draftLabel = version.label ?? ""
-                    },
-                    onDelete: { library.delete(version: $0) },
-                    onReveal: { version in
-                        guard let path = version.audioAsset?.relativePath else { return }
-                        RevealInFinder.reveal(services.mediaStore.url(forRelativePath: path))
-                    }
-                )
-            }
-            .frame(maxHeight: 420)
-        }
-        .padding(DubplateLayout.xxl)
-        .frame(width: 620)
-        .background(DubplateColor.raised)
-        .alert("Rename Version", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
-            TextField("Label", text: $draftLabel)
-            Button("Cancel", role: .cancel) { renaming = nil }
-            Button("Save") {
-                if let version = renaming {
-                    library.rename(version: version, to: draftLabel)
-                }
-                renaming = nil
-            }
-        } message: {
-            Text("What do you call this mix?")
-        }
     }
 }

@@ -440,12 +440,20 @@ public final class PlayerController {
         ticker = nil
     }
 
+    /// Moves the interface's playhead. Now Playing is not touched here: the system
+    /// extrapolates it from the rate, and republishing on a timer costs an XPC round
+    /// trip several times a second for the length of a record.
     private func tick() {
         guard isPlaying else { return }
         if scrubTime == nil {
             currentTime = engine.currentTime
         }
-        nowPlaying.updatePosition(elapsed: currentTime, isPlaying: isPlaying)
+    }
+
+    /// Called when a cover changes, so the Lock Screen does not keep the old one.
+    public func invalidateArtwork() {
+        nowPlaying.invalidateAllArtwork()
+        refreshNowPlaying()
     }
 
     private func refreshNowPlaying() {

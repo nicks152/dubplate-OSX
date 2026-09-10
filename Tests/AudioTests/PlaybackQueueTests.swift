@@ -3,6 +3,22 @@ import DubplateCore
 @testable import DubplateAudio
 
 /// Skipping, shuffling, repeating and running off the end — without an audio device.
+/// A generator with no entropy, so a shuffle test asserts something.
+struct SeededGenerator: RandomNumberGenerator {
+    private var state: UInt64
+
+    init(seed: UInt64) {
+        state = seed &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+    }
+
+    mutating func next() -> UInt64 {
+        state ^= state << 13
+        state ^= state >> 7
+        state ^= state << 17
+        return state
+    }
+}
+
 final class PlaybackQueueTests: XCTestCase {
 
     private func item(_ index: Int, releaseID: UUID = UUID()) -> PlaybackQueueItem {
@@ -137,6 +153,22 @@ final class PlaybackQueueTests: XCTestCase {
         queue.playNext(inserted)
         XCTAssertEqual(queue.upNext.first?.id, inserted.id)
         XCTAssertEqual(queue.upNext.count, 3)
+    }
+
+    /// Shuffle has one implementation; the test injects a generator rather than
+    /// exercising a second copy of the logic.
+    func testShuffleIsDeterministicWithAFixedGenerator() {
+        var first = makeQueue(8)
+        var second = makeQueue(8)
+        var generatorA = SeededGenerator(seed: 42)
+        var generatorB = SeededGenerator(seed: 42)
+
+        first.setShuffled(true)
+        first.rebuildOrder(using: &generatorA)
+        second.setShuffled(true)
+        second.rebuildOrder(using: &generatorB)
+
+        XCTAssertEqual(first.upNext.map(\.title), second.upNext.map(\.title))
     }
 
     func testEmptyQueueIsHarmless() {

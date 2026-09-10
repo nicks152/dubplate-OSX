@@ -17,11 +17,10 @@ struct PhoneRootView: View {
     @State private var isShowingPlayer = false
     @State private var previewMode: PreviewMode = .stream
     @State private var searchText = ""
-    @State private var isImporting = false
 
     var body: some View {
         NavigationStack(path: $path) {
-            PhoneHomeScreen(path: $path, searchText: $searchText, isImporting: $isImporting)
+            PhoneHomeScreen(path: $path, searchText: $searchText)
                 .navigationDestination(for: UUID.self) { releaseID in
                     if let release = library.release(id: releaseID) {
                         PhoneReleaseScreen(release: release)
@@ -46,25 +45,25 @@ struct PhoneRootView: View {
         .fullScreenCover(isPresented: $isShowingPlayer) {
             PhonePlayerScreen(mode: $previewMode, onDismiss: { isShowingPlayer = false })
         }
-        .fileImporter(
-            isPresented: $isImporting,
-            allowedContentTypes: [.audio],
-            allowsMultipleSelection: true
-        ) { result in
-            guard case .success(let urls) = result else { return }
-            Task { await importToInbox(urls) }
-        }
         .overlay(alignment: .bottom) {
-            if let error = library.lastError ?? player.lastError ?? services.startupNotice {
-                ErrorBanner(error: error) {
-                    library.lastError = nil
-                    player.clearError()
-                    services.dismissStartupNotice()
+            VStack(spacing: DubplateLayout.s) {
+                if let waiting = player.awaitingDownloadOf {
+                    Toast(message: "Downloading “\(waiting.title)” — it’ll start in a moment") {
+                        player.abandonPendingItem()
+                    }
                 }
-                .padding(DubplateLayout.l)
-                .padding(.bottom, 88)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                if let error = library.lastError ?? player.lastError ?? services.sync.lastError ?? services.startupNotice {
+                    ErrorBanner(error: error) {
+                        library.lastError = nil
+                        player.clearError()
+                        services.sync.clearError()
+                        services.dismissStartupNotice()
+                    }
+                }
             }
+            .padding(DubplateLayout.l)
+            .padding(.bottom, 88)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
         }
         .animation(DubplateMotion.standard, value: library.lastError?.id)
         .onAppear { previewMode = services.settings.defaultPreviewMode }
@@ -75,11 +74,4 @@ struct PhoneRootView: View {
         return library.release(id: releaseID)?.artwork
     }
 
-    /// Files brought in on the phone land in the Inbox rather than guessing which
-    /// record they belong to.
-    private func importToInbox(_ urls: [URL]) async {
-        let plan = library.plan(for: urls, in: nil)
-        await library.apply(plan, to: nil)
-        await services.registerNewMedia(in: nil)
-    }
 }

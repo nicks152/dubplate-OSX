@@ -101,6 +101,32 @@ final class FilenameParserTests: XCTestCase {
         XCTAssertFalse(FilenameParser.isAudio("notes"))
     }
 
+    /// Instrument and mix descriptors are perfectly good song titles. Stripping
+    /// them unconditionally turned "05 Bass.wav" into a nameless track five.
+    func testDescriptorsAreOnlyMarkersWhenARealWordSurvives() {
+        check("05 Bass.wav", number: 5, title: "Bass", label: nil)
+        check("07 Instrumental.wav", number: 7, title: "Instrumental", label: nil)
+        check("09 Clean.wav", number: 9, title: "Clean", label: nil)
+        check("Midnight drums.wav", number: nil, title: "Midnight", label: "Drums")
+        check("Midnight instrumental.wav", number: nil, title: "Midnight", label: "Instrumental")
+    }
+
+    /// An instrumental is a different rendering, not a newer mix, so it must never
+    /// silently become the mix everyone hears.
+    func testVariantsAreFlagged() {
+        XCTAssertTrue(FilenameParser.parse("Midnight instrumental.wav").isVariant)
+        XCTAssertTrue(FilenameParser.parse("Midnight (radio edit).wav").isVariant)
+        XCTAssertFalse(FilenameParser.parse("Midnight mix 6.wav").isVariant)
+        XCTAssertFalse(FilenameParser.parse("Midnight new drums.wav").isVariant)
+    }
+
+    /// "04 Midnight" names track four. "24 Hours" is a song.
+    func testOnlyAPaddedNumberNamesATrackSlot() {
+        check("24 Hours.wav", number: 24, title: "24 Hours", label: nil)
+        check("7 Rings.wav", number: 7, title: "7 Rings", label: nil)
+        check("04 Midnight.wav", number: 4, title: "Midnight", label: nil)
+    }
+
     /// Names Dubplate has to survive rather than understand. None of these are
     /// good answers; all of them are answers, which is the requirement.
     func testAwkwardNames() {

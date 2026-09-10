@@ -28,12 +28,6 @@ final class ImportPlannerTests: XCTestCase {
         XCTAssertEqual(plan.newTracks.map(\.trackNumber), [1, 2, 3])
     }
 
-    func testUnnumberedBouncesKeepTheDropOrder() {
-        let plan = ImportPlanner.plan(candidates: candidates(["Dust.wav", "Intro.wav", "Midnight.wav"]))
-        XCTAssertEqual(plan.orderingSignal, .dropOrder)
-        XCTAssertEqual(plan.newTracks.map(\.title), ["Dust", "Intro", "Midnight"])
-    }
-
     /// Several bounces of the same unknown song are one track with versions, not
     /// three tracks with the same name.
     func testRepeatedBouncesBecomeVersionsOfOneTrack() {
@@ -93,6 +87,14 @@ final class ImportPlannerTests: XCTestCase {
     func testDuplicateNumbersFallBackToFilenameOrder() {
         let plan = ImportPlanner.plan(candidates: candidates(["01 A.wav", "01 B.wav", "02 C.wav"]))
         XCTAssertNotEqual(plan.orderingSignal, .filenameNumbers)
+    }
+
+    /// A multi-file drag does not promise an order, so filename order is used and
+    /// the sheet says so.
+    func testUnnumberedDropsAreSortedByFilename() {
+        let plan = ImportPlanner.plan(candidates: candidates(["Dust.wav", "After Dark.wav", "Intro.wav"]))
+        XCTAssertEqual(plan.orderingSignal, .filename)
+        XCTAssertEqual(plan.newTracks.map(\.title), ["After Dark", "Dust", "Intro"])
     }
 
     func testVersionOrderingUsesCreationDateWhenThereIsNoNumber() {

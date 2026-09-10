@@ -8,6 +8,19 @@ import UIKit
 import AppKit
 #endif
 
+/// A looping visual and the trim applied to it.
+public struct MotionSource: Hashable, Sendable {
+    public let url: URL
+    public let loopStart: TimeInterval
+    public let loopDuration: TimeInterval
+
+    public init(url: URL, loopStart: TimeInterval = 0, loopDuration: TimeInterval = 0) {
+        self.url = url
+        self.loopStart = loopStart
+        self.loopDuration = loopDuration
+    }
+}
+
 /// A silent, looping video used for animated artwork and track canvases.
 ///
 /// `AVPlayerLooper` rather than restarting on the end notification, so the loop has

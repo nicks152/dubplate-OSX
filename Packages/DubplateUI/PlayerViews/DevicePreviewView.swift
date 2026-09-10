@@ -11,7 +11,7 @@ import DubplateAudio
 public struct DevicePreviewView: View {
     private let player: PlayerController
     private let artwork: ArtworkAsset?
-    private let canvasURL: URL?
+    private let canvas: MotionSource?
     @Binding private var mode: PreviewMode
 
     /// iPhone 15/16 logical size. Fixed on purpose: previewing at an arbitrary size
@@ -21,12 +21,12 @@ public struct DevicePreviewView: View {
     public init(
         player: PlayerController,
         artwork: ArtworkAsset?,
-        canvasURL: URL? = nil,
+        canvas: MotionSource? = nil,
         mode: Binding<PreviewMode>
     ) {
         self.player = player
         self.artwork = artwork
-        self.canvasURL = canvasURL
+        self.canvas = canvas
         self._mode = mode
     }
 
@@ -45,7 +45,7 @@ public struct DevicePreviewView: View {
                 NowPlayingView(
                     player: player,
                     artwork: artwork,
-                    canvasURL: canvasURL,
+                    canvas: canvas,
                     mode: $mode,
                     showsModePicker: false
                 )

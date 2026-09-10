@@ -9,7 +9,6 @@ public final class ArtworkAsset {
     public var filename: String = ""
     public var originalFilename: String = ""
     public var relativePath: String = ""
-    public var cloudRecordName: String?
     public var width: Int = 0
     public var height: Int = 0
     public var fileSize: Int64 = 0
@@ -26,8 +25,6 @@ public final class ArtworkAsset {
     public var loopStart: TimeInterval = 0
     /// Loop length in seconds. Zero means "the whole file".
     public var loopDuration: TimeInterval = 0
-    /// Whether the source video's own audio should be silenced during playback.
-    public var mutesSourceAudio: Bool = true
     /// A small JPEG rendition used for lists, remote command centre artwork and the
     /// Lock Screen so nothing decodes a 4000px cover on a scroll.
     public var thumbnailData: Data?

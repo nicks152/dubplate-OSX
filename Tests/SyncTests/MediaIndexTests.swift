@@ -80,6 +80,49 @@ final class MediaIndexTests: XCTestCase {
         XCTAssertEqual(await index.all().count, 1)
     }
 
+    /// A descriptor rebuilt from the library carries `isUploaded == false`.
+    /// Overwriting the real value with it re-uploaded whole albums.
+    func testRebuildingTheIndexDoesNotForgetWhatIsUploaded() async throws {
+        let index = MediaIndex(directory: directory)
+        let entry = descriptor()
+        await index.record(entry)
+        await index.markUploaded(entry.assetID)
+
+        var rebuilt = entry
+        rebuilt.isUploaded = false
+        await index.record(rebuilt)
+
+        XCTAssertTrue(await index.descriptor(for: entry.assetID)?.isUploaded == true)
+        XCTAssertTrue(await index.pendingUploads().isEmpty)
+    }
+
+    /// An account switch means nothing on this device can be assumed to be in the
+    /// new account.
+    func testAnAccountChangeClearsUploadState() async throws {
+        let index = MediaIndex(directory: directory)
+        let entry = descriptor(uploaded: true)
+        await index.record(entry)
+
+        await index.markEverythingNotUploaded()
+
+        XCTAssertFalse(await index.descriptor(for: entry.assetID)?.isUploaded == true)
+        XCTAssertEqual(await index.pendingUploads().count, 1)
+    }
+
+    /// A damaged index must not be replaced with an empty one before it can be
+    /// rebuilt — that would destroy the only record of what is already uploaded.
+    func testACorruptIndexIsNotOverwrittenWithNothing() async throws {
+        let url = directory.appending(path: "media-index.json")
+        try Data("not json".utf8).write(to: url)
+
+        let index = MediaIndex(directory: directory)
+        XCTAssertTrue(await index.all().isEmpty)
+        await index.remove(UUID())
+        await index.flush()
+
+        XCTAssertEqual(try Data(contentsOf: url), Data("not json".utf8))
+    }
+
     func testSyncStatusCopy() {
         XCTAssertFalse(SyncStatus.synced.isWorthMentioning)
         XCTAssertTrue(SyncStatus.downloading.isWorthMentioning)

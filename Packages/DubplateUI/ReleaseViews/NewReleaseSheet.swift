@@ -20,6 +20,8 @@ public struct NewReleaseSheet: View {
     private let onCreate: (Result) -> Void
 
     @State private var type: ReleaseType = .album
+    /// Once someone picks a type, Dubplate stops guessing at it.
+    @State private var typeWasChosen = false
     @State private var title = ""
     @State private var artistName = ""
     @State private var artworkURL: URL?
@@ -87,6 +89,7 @@ public struct NewReleaseSheet: View {
             ForEach(ReleaseType.allCases, id: \.self) { option in
                 Button {
                     type = option
+                    typeWasChosen = true
                 } label: {
                     Text(option.displayName)
                         .font(.system(size: 12, weight: .medium))
@@ -131,7 +134,8 @@ public struct NewReleaseSheet: View {
             }
         }
         .dropDestination(for: URL.self) { urls, _ in
-            guard let match = urls.first(where: { FilenameParser.isImage($0.lastPathComponent) }) else {
+            let files = DroppedFiles.expand(urls)
+            guard let match = files.first(where: { FilenameParser.isImage($0.lastPathComponent) }) else {
                 return false
             }
             artworkURL = match
@@ -142,22 +146,32 @@ public struct NewReleaseSheet: View {
     private var audioWell: some View {
         DropWell(
             title: audioURLs.isEmpty ? "Drop bounces" : "\(audioURLs.count) file\(audioURLs.count == 1 ? "" : "s")",
-            detail: audioURLs.isEmpty ? "WAV, AIFF, FLAC, ALAC, M4A, MP3" : "Dubplate will sequence them for you",
+            detail: audioURLs.isEmpty
+                ? "Drop the whole bounce folder — Dubplate will find the audio and the cover"
+                : "Dubplate will sequence them for you",
             isTargeted: isTargetedForAudio,
             height: 132
         ) {
             EmptyView()
         }
         .dropDestination(for: URL.self) { urls, _ in
-            let audio = urls.filter { FilenameParser.isAudio($0.lastPathComponent) }
-            guard !audio.isEmpty else { return false }
+            let files = DroppedFiles.expand(urls)
+            let audio = files.filter { FilenameParser.isAudio($0.lastPathComponent) }
+            // One well that routes by type, so a folder containing the bounces and
+            // the cover is a single drag.
+            if artworkURL == nil {
+                artworkURL = files.first { FilenameParser.isImage($0.lastPathComponent) }
+            }
+            guard !audio.isEmpty else { return artworkURL != nil }
             audioURLs.append(contentsOf: audio)
             if title.trimmingCharacters(in: .whitespaces).isEmpty,
                let first = audio.first {
                 // A folder of bounces usually knows what the record is called.
                 title = first.deletingLastPathComponent().lastPathComponent
             }
-            type = ReleaseType.inferred(fromTrackCount: audioURLs.count)
+            if !typeWasChosen {
+                type = ReleaseType.inferred(fromTrackCount: audioURLs.count)
+            }
             return true
         } isTargeted: { isTargetedForAudio = $0 }
     }

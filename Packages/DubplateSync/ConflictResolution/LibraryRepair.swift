@@ -38,8 +38,16 @@ public enum LibraryRepair {
             changed = true
         }
 
+        let duration = release.orderedTracks.reduce(0) { $0 + $1.duration }
+        if release.cachedDuration != duration {
+            release.cachedDuration = duration
+            changed = true
+        }
+
         if changed {
-            release.updatedAt = Date()
+            // Deliberately not touching `updatedAt`: the library is sorted by it,
+            // and a repair on open would reorder the shelf under the person.
+            release.repairedAt = Date()
             do {
                 try context.save()
             } catch {

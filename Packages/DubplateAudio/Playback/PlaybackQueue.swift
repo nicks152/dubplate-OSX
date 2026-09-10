@@ -221,22 +221,13 @@ public struct PlaybackQueue: Sendable {
         order.append(items.count - 1)
     }
 
+    /// One implementation, with an injectable generator so a test can be
+    /// deterministic without a second copy of the logic to drift from it.
     private mutating func rebuildOrder() {
-        let indices = Array(items.indices)
-        guard isShuffled else {
-            order = indices
-            return
-        }
-        var rest = indices.filter { $0 != currentIndex }
-        rest.shuffle()
-        if let currentIndex {
-            order = [currentIndex] + rest
-        } else {
-            order = rest
-        }
+        var generator = SystemRandomNumberGenerator()
+        rebuildOrder(using: &generator)
     }
 
-    /// Deterministic shuffle, for tests.
     mutating func rebuildOrder(using generator: inout some RandomNumberGenerator) {
         let indices = Array(items.indices)
         guard isShuffled else {

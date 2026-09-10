@@ -9,7 +9,6 @@ import DubplateCore
 /// `NSCache`, which means the system evicts it under pressure rather than Dubplate
 /// guessing when to.
 @MainActor
-@Observable
 public final class ArtworkLoader {
     private let mediaStore: MediaStore
     private let cache = NSCache<NSString, DubplateImage>()
@@ -18,6 +17,9 @@ public final class ArtworkLoader {
     public init(mediaStore: MediaStore) {
         self.mediaStore = mediaStore
         cache.countLimit = 240
+        // A 2048px cover is 16 MB decoded, so a count limit alone allows a gigabyte
+        // of bitmaps. 96 MB is generous for a grid and survivable on a phone.
+        cache.totalCostLimit = 96 * 1_024 * 1_024
     }
 
     /// Cached image, if it is already decoded. Views call this first so a scroll
@@ -55,7 +57,7 @@ public final class ArtworkLoader {
         let image = await task.value
         inFlight[cacheKey] = nil
         if let image {
-            cache.setObject(image, forKey: cacheKey as NSString)
+            cache.setObject(image, forKey: cacheKey as NSString, cost: cost(of: image))
         }
         return image
     }
@@ -69,6 +71,16 @@ public final class ArtworkLoader {
 
     public func invalidateAll() {
         cache.removeAllObjects()
+    }
+
+    /// Roughly the bytes a decoded image occupies.
+    private func cost(of image: DubplateImage) -> Int {
+        #if os(iOS)
+        let pixels = Int(image.size.width * image.scale * image.size.height * image.scale)
+        #else
+        let pixels = Int(image.size.width * image.size.height)
+        #endif
+        return max(1, pixels * 4)
     }
 
     /// Renditions are bucketed so a resize does not decode a new image per point.

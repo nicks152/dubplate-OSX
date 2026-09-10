@@ -162,3 +162,48 @@ public struct ErrorBanner: View {
         return error.detail
     }
 }
+
+/// A line that says what just happened, and then goes away.
+///
+/// Silence after a drop is what makes a bounce that was recognised as a duplicate
+/// indistinguishable from one that was lost.
+public struct Toast: View {
+    private let message: String
+    private let onDismiss: () -> Void
+
+    public init(message: String, onDismiss: @escaping () -> Void) {
+        self.message = message
+        self.onDismiss = onDismiss
+    }
+
+    public var body: some View {
+        HStack(spacing: DubplateLayout.m) {
+            Text(message)
+                .font(.system(size: 13))
+                .foregroundStyle(DubplateColor.primaryText)
+                .lineLimit(2)
+            Spacer(minLength: 0)
+            Button {
+                onDismiss()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(DubplateColor.tertiaryText)
+                    .frame(width: 24, height: 24)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Dismiss")
+        }
+        .padding(.leading, DubplateLayout.l)
+        .padding(.trailing, DubplateLayout.xs)
+        .padding(.vertical, DubplateLayout.s)
+        .background(DubplateColor.raised, in: Capsule())
+        .overlay(Capsule().strokeBorder(DubplateColor.hairline))
+        .shadow(color: .black.opacity(0.2), radius: 16, y: 6)
+        .task {
+            try? await Task.sleep(for: .seconds(6))
+            onDismiss()
+        }
+        .accessibilityElement(children: .combine)
+    }
+}

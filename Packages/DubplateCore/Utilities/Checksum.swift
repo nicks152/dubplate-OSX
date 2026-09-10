@@ -37,16 +37,6 @@ public enum Checksum {
         return digestString(hasher.finalize())
     }
 
-    public static func full(ofFileAt url: URL) throws -> String {
-        let handle = try FileHandle(forReadingFrom: url)
-        defer { try? handle.close() }
-        var hasher = SHA256()
-        while let chunk = try handle.read(upToCount: windowSize), !chunk.isEmpty {
-            hasher.update(data: chunk)
-        }
-        return digestString(hasher.finalize())
-    }
-
     public static func of(_ data: Data) -> String {
         digestString(SHA256.hash(data: data))
     }

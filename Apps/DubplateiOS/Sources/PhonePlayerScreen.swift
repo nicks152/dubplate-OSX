@@ -18,7 +18,7 @@ struct PhonePlayerScreen: View {
         NowPlayingView(
             player: player,
             artwork: currentArtwork,
-            canvasURL: currentCanvasURL,
+            canvas: currentCanvas,
             mode: $mode,
             onShowVersions: { isShowingVersions = true },
             onShowQueue: { isShowingQueue = true },
@@ -61,18 +61,16 @@ struct PhonePlayerScreen: View {
 
     /// A track canvas wins over the release's motion artwork, the way a per-track
     /// visual should.
-    private var currentCanvasURL: URL? {
-        if let path = player.currentItem?.canvasRelativePath,
-           services.mediaStore.exists(relativePath: path) {
-            return services.mediaStore.url(forRelativePath: path)
+    private var currentCanvas: MotionSource? {
+        if let track = currentTrack, let canvas = track.canvas {
+            return services.motionSource(for: canvas)
         }
         guard let releaseID = player.currentItem?.releaseID,
-              let motion = library.release(id: releaseID)?.animatedArtwork,
-              services.mediaStore.exists(relativePath: motion.relativePath)
+              let motion = library.release(id: releaseID)?.animatedArtwork
         else {
             return nil
         }
-        return services.mediaStore.url(forRelativePath: motion.relativePath)
+        return services.motionSource(for: motion)
     }
 }
 

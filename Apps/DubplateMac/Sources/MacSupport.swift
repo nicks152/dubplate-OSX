@@ -80,8 +80,10 @@ struct InboxScreen: View {
     @Environment(LibraryStore.self) private var library
     @Environment(PlayerController.self) private var player
 
+    @Environment(\.modelContext) private var context
     @State private var isTargeted = false
     @State private var selection: UUID?
+    @State private var trackToFile: Track?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -99,17 +101,19 @@ struct InboxScreen: View {
             if tracks.isEmpty {
                 EmptyState(
                     headline: "Inbox is empty",
-                    message: "Drop a bounce here when you want to hear it back without deciding what record it belongs to."
+                    message: "Drop a bounce here when you want to hear it back without deciding what record it belongs to. Right-click one later to file it."
                 )
             } else {
                 TrackListView(
                     tracks: tracks,
                     currentTrackID: player.currentItem?.trackID,
                     isPlaying: player.isPlaying,
+                    playingVersionID: player.currentItem?.versionID,
                     selection: $selection,
                     allowsReordering: false,
                     onPlay: { services.play(track: $0) },
-                    onDelete: { library.delete(track: $0) }
+                    onRemove: { trackToFile = $0 },
+                    onDelete: { services.delete(track: $0) }
                 )
             }
         }
@@ -127,6 +131,23 @@ struct InboxScreen: View {
             }
             return true
         } isTargeted: { isTargeted = $0 }
+        // The Inbox used to be a room with no exit: you could put a bounce in and
+        // never decide what record it belonged to.
+        .confirmationDialog(
+            trackToFile.map { "Add “\($0.displayTitle)” to a release" } ?? "",
+            isPresented: Binding(get: { trackToFile != nil }, set: { if !$0 { trackToFile = nil } }),
+            titleVisibility: .visible
+        ) {
+            ForEach(library.releases()) { release in
+                Button(release.title.isEmpty ? "Untitled" : release.title) {
+                    if let track = trackToFile {
+                        library.move(track: track, to: release)
+                    }
+                    trackToFile = nil
+                }
+            }
+            Button("Cancel", role: .cancel) { trackToFile = nil }
+        }
     }
 }
 

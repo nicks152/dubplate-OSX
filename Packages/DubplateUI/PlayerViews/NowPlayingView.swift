@@ -10,7 +10,7 @@ import DubplateAudio
 public struct NowPlayingView: View {
     private let player: PlayerController
     private let artwork: ArtworkAsset?
-    private let canvasURL: URL?
+    private let canvas: MotionSource?
     @Binding private var mode: PreviewMode
     private let showsModePicker: Bool
     private let onShowVersions: (() -> Void)?
@@ -20,7 +20,7 @@ public struct NowPlayingView: View {
     public init(
         player: PlayerController,
         artwork: ArtworkAsset?,
-        canvasURL: URL? = nil,
+        canvas: MotionSource? = nil,
         mode: Binding<PreviewMode>,
         showsModePicker: Bool = true,
         onShowVersions: (() -> Void)? = nil,
@@ -29,7 +29,7 @@ public struct NowPlayingView: View {
     ) {
         self.player = player
         self.artwork = artwork
-        self.canvasURL = canvasURL
+        self.canvas = canvas
         self._mode = mode
         self.showsModePicker = showsModePicker
         self.onShowVersions = onShowVersions
@@ -48,7 +48,7 @@ public struct NowPlayingView: View {
                 case .gallery:
                     GalleryModeView(player: player, artwork: artwork, onShowVersions: onShowVersions)
                 case .motion:
-                    MotionModeView(player: player, artwork: artwork, canvasURL: canvasURL, onShowVersions: onShowVersions)
+                    MotionModeView(player: player, artwork: artwork, canvas: canvas, onShowVersions: onShowVersions)
                 }
             }
             .transition(.opacity)
