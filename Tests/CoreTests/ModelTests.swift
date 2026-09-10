@@ -198,4 +198,32 @@ final class ModelTests: XCTestCase {
         asset.transferState = .downloading
         XCTAssertEqual(asset.availability, .downloading)
     }
+
+    /// The running order is reordered by `moveElements`, which stands in for
+    /// SwiftUI's `move(fromOffsets:toOffset:)` because the model layer imports no
+    /// UI framework. It has to behave identically, including the part everyone gets
+    /// wrong: `toOffset` is an index in the *original* array.
+    func testMoveElementsMatchesSwiftUISemantics() {
+        func moved(_ items: [String], _ offsets: IndexSet, _ destination: Int) -> [String] {
+            var copy = items
+            copy.moveElements(fromOffsets: offsets, toOffset: destination)
+            return copy
+        }
+        let items = ["A", "B", "C", "D"]
+
+        XCTAssertEqual(moved(items, IndexSet([0]), 2), ["B", "A", "C", "D"])
+        XCTAssertEqual(moved(items, IndexSet([3]), 0), ["D", "A", "B", "C"])
+        XCTAssertEqual(moved(items, IndexSet([0, 1]), 4), ["C", "D", "A", "B"])
+        XCTAssertEqual(moved(items, IndexSet([0]), 4), ["B", "C", "D", "A"])
+        XCTAssertEqual(moved(["A", "B", "C", "D", "E"], IndexSet([1, 3]), 0),
+                       ["B", "D", "A", "C", "E"])
+
+        // Dropping a row on itself is not a change.
+        XCTAssertEqual(moved(items, IndexSet([2]), 2), items)
+        XCTAssertEqual(moved(items, IndexSet([1]), 1), items)
+
+        // Nonsense in, the array back out.
+        XCTAssertEqual(moved(items, IndexSet(), 2), items)
+        XCTAssertEqual(moved(items, IndexSet([9]), 0), items)
+    }
 }

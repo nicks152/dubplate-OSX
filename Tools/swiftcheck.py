@@ -548,6 +548,36 @@ def check_own_members(module: Module, sources: dict[str, str], allow: set[str],
                     f"'{name}' calls '{called}()', which it does not declare"))
 
 
+# Methods that read like the standard library and are not: SwiftUI adds each of
+# these in an extension, so they exist in a file that imports SwiftUI and nowhere
+# else. Used in a module that has no business importing a UI framework, they
+# compile in the editor's imagination and fail on the build.
+SWIFTUI_ONLY_MEMBERS = {
+    "move(fromOffsets:": "SwiftUI's extension on RangeReplaceableCollection",
+    "remove(atOffsets:": "SwiftUI's extension on RangeReplaceableCollection",
+}
+
+
+def check_swiftui_only_members(module, sources: dict[str, str],
+                               findings: list[Finding]) -> None:
+    """Flags SwiftUI-only collection helpers in a module that does not import it."""
+    for path in module.files:
+        code = sources[path]
+        if re.search(r"^\s*import\s+SwiftUI\b", code, re.M):
+            continue
+        for needle, origin in SWIFTUI_ONLY_MEMBERS.items():
+            start = 0
+            while True:
+                found = code.find("." + needle, start)
+                if found < 0:
+                    break
+                line = code[:found].count("\n") + 1
+                findings.append(Finding(
+                    "error", rel(path), line, "swiftui-only",
+                    f"'{needle}…)' comes from {origin}, and this file does not import SwiftUI"))
+                start = found + 1
+
+
 ENVIRONMENT_USE_RE = re.compile(r"@Environment\(\s*([A-Z][A-Za-z0-9_]*)\.self\s*\)")
 ENVIRONMENT_INJECT_RE = re.compile(r"\.environment\(\s*([A-Za-z0-9_.]+)")
 OBSERVABLE_CLASS_RE = re.compile(
@@ -730,6 +760,8 @@ def main() -> int:
     for module in modules:
         collect_declarations(module, sources, findings)
     check_environment_objects(modules, sources, findings)
+    for module in modules:
+        check_swiftui_only_members(module, sources, findings)
     for module in modules:
         check_own_members(module, sources, allow, findings)
     for module in modules:

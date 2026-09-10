@@ -168,7 +168,7 @@ public final class LibraryStore {
 
     public func move(in release: Release, fromOffsets offsets: IndexSet, toOffset destination: Int) {
         var ordered = release.orderedTracks
-        ordered.move(fromOffsets: offsets, toOffset: destination)
+        ordered.moveElements(fromOffsets: offsets, toOffset: destination)
         release.applyOrder(ordered)
         save()
     }
