@@ -23,7 +23,7 @@ place to put files. It has one job, and everything in it points at that job.
 | `Packages/DubplateUI` | Design system, shared views, the three preview modes |
 | `Tests/` | Unit and UI tests |
 | `Documentation/` | Product, architecture, data model, sync, QA, critic reviews |
-| `Tools/` | Project generation, static checks, fixture generation |
+| `Tools/` | Project generation, static checks, icon and fixture generation |
 
 ## Building
 
@@ -40,8 +40,15 @@ Pick the **Dubplate Mac** or **Dubplate iOS** scheme and run. The shared modules
 consumed as a local Swift package, so Xcode resolves them from the `Package.swift`
 at the repository root with nothing to install.
 
+The application icon is drawn procedurally rather than committed as art from
+somewhere else — `Tools/make_app_icon.py` writes both asset catalogs, and the PNGs
+it produces are checked in so a clone builds without running it.
+
 Before the first build on your own machine, set a development team on both
-application targets (Signing & Capabilities). iCloud sync additionally needs the
+application targets (Signing & Capabilities). The Mac target needs the Push
+Notifications capability as well as iCloud: CloudKit uses silent push to tell a
+device that a remote zone changed, and without it the Mac only picks up the phone's
+edits on relaunch. iCloud sync additionally needs the
 `iCloud.com.dubplate.app` container to exist in your developer account; **without
 it Dubplate still runs and still works, entirely locally** — it falls back to a
 local store and says so once.
@@ -71,6 +78,8 @@ python3 Tools/make_placeholder_art.py
 python3 Tools/swiftcheck.py          # whole-program consistency checks
 python3 Tools/pbxcheck.py            # validates the Xcode project
 python3 Tools/generate_xcodeproj.py  # after adding or removing an application source file
+python3 Tools/make_app_icon.py       # redraws the application icon and both asset catalogs
+python3 Tools/render_design.py       # redraws Documentation/design/renders (needs Chromium)
 ```
 
 `swiftcheck.py` is not a substitute for the compiler — it exists so the tree can be
