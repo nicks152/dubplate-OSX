@@ -87,7 +87,7 @@ struct ReleaseDetailScreen: View {
                 onCancel: { pendingDrop = nil },
                 onChoose: { choice in
                     pendingDrop = nil
-                    Task { await applyDrop(choice: choice, urls: drop.urls, track: drop.track) }
+                    Task { await applyDrop(choice: choice, urls: drop.urls, track: drop.track, startsPlaying: true) }
                 }
             )
         }
@@ -344,7 +344,7 @@ struct ReleaseDetailScreen: View {
         // current, and play it — the sheet is for the ambiguous case.
         let isObvious = audio.count == 1 && (match?.trackID == track.id || match == nil)
         if isObvious {
-            Task { await applyDrop(choice: .addAsNewVersion, urls: audio, track: track) }
+            Task { await applyDrop(choice: .addAsNewVersion, urls: audio, track: track, startsPlaying: false) }
         } else {
             pendingDrop = PendingTrackDrop(track: track, urls: audio, match: match)
         }
@@ -392,7 +392,12 @@ struct ReleaseDetailScreen: View {
         }
     }
 
-    private func applyDrop(choice: TrackDropChoice, urls: [URL], track: Track) async {
+    private func applyDrop(
+        choice: TrackDropChoice,
+        urls: [URL],
+        track: Track,
+        startsPlaying: Bool
+    ) async {
         var outcome = ImportOutcome()
         for url in urls {
             let result = await library.apply(choice: choice, url: url, to: track)
@@ -405,8 +410,14 @@ struct ReleaseDetailScreen: View {
         services.report(outcome, trackTitle: track.displayTitle)
         await services.registerNewMedia(in: release)
 
-        // The sheet's own copy says the new mix starts playing, so it has to.
-        if let newest = track.currentVersion, !outcome.addedVersions.isEmpty {
+        // The sheet's own copy says the new mix starts playing, so when the drop
+        // came through the sheet it has to. A bare drag onto track 8 while track 3
+        // is playing must not: nothing about dropping a file on a row asks for the
+        // record to jump, and having it happen mid-listen is the kind of thing that
+        // makes a producer stop dragging things in.
+        let interrupts = player.currentItem != nil && player.currentItem?.trackID != track.id
+        let shouldPlay = !outcome.addedVersions.isEmpty && (startsPlaying || !interrupts)
+        if shouldPlay, let newest = track.currentVersion {
             services.audition(version: newest, of: track)
         } else {
             services.refreshQueueEntry(for: track)

@@ -60,6 +60,7 @@ public final class AppServices {
         // to be established by looking — and before the first frame, not after it,
         // because an asset nobody has looked at yet answers "not here".
         MediaAvailability.refreshAll(in: context, using: mediaStore)
+        Self.sweepUnreferencedMedia(in: context, using: mediaStore)
 
         player.didStartRelease = { [weak self] releaseID in
             guard let self, let release = library.release(id: releaseID) else { return }
@@ -73,6 +74,26 @@ public final class AppServices {
             guard let self else { return }
             artwork.invalidateAll()
             player.invalidateArtwork()
+        }
+    }
+
+    /// Deletes media files no asset refers to.
+    ///
+    /// An import copies bytes into place before it writes the row, so a force quit
+    /// in between leaves a file nothing owns. Only ever called at launch, and only
+    /// with identifiers that were actually read: if either fetch fails the sweep is
+    /// skipped entirely, because an empty set would mean "delete everything".
+    private static func sweepUnreferencedMedia(in context: ModelContext, using store: MediaStore) {
+        guard let audio = try? context.fetch(FetchDescriptor<AudioAsset>()),
+              let artwork = try? context.fetch(FetchDescriptor<ArtworkAsset>())
+        else {
+            Log.media.error("Could not read the library; leaving unreferenced media alone")
+            return
+        }
+        let known = Set(audio.map(\.id)).union(artwork.map(\.id))
+        let removed = store.removeMedia(notReferencedBy: known)
+        if removed > 0 {
+            Log.media.info("Removed \(removed) media file(s) left behind by an interrupted import")
         }
     }
 

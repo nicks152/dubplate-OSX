@@ -173,6 +173,41 @@ public struct MediaStore: Sendable {
         return removed
     }
 
+    /// Deletes media files that no asset in the library refers to.
+    ///
+    /// An import copies the bytes into place and *then* writes the database row.
+    /// Quitting between those two — a force quit, a crash, a phone that ran out of
+    /// memory — leaves a file no one owns and nothing else will ever clean up, and
+    /// a producer's masters are large enough that a few of those matter.
+    ///
+    /// Every filename is the identifier of the asset that owns it, so an orphan is
+    /// one whose identifier the library has never heard of. A file whose name is
+    /// not an identifier is left alone, and the caller must pass identifiers it
+    /// actually read: an empty set from a failed fetch would take the whole store.
+    @discardableResult
+    public func removeMedia(notReferencedBy known: Set<UUID>) -> Int {
+        var removed = 0
+        let keys: [URLResourceKey] = [.isRegularFileKey]
+        guard let enumerator = fileManager.enumerator(at: root, includingPropertiesForKeys: keys) else {
+            return 0
+        }
+        for case let url as URL in enumerator {
+            let name = url.lastPathComponent
+            guard !name.hasPrefix(".") else { continue }
+            guard (try? url.resourceValues(forKeys: Set(keys)))?.isRegularFile == true else { continue }
+            guard let identifier = UUID(uuidString: url.deletingPathExtension().lastPathComponent),
+                  !known.contains(identifier)
+            else {
+                continue
+            }
+            if (try? fileManager.removeItem(at: url)) != nil {
+                removed += 1
+                Log.media.info("Removed a media file no release refers to")
+            }
+        }
+        return removed
+    }
+
     /// Media is reproducible from iCloud and can be very large, so it stays out of
     /// device backups. Metadata — the part that is irreplaceable — is not excluded.
     private func excludeFromDeviceBackup() throws {

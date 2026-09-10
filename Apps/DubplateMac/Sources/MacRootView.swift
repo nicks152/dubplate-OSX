@@ -65,6 +65,20 @@ struct MacRootView: View {
                 if let summary = services.lastImportSummary {
                     Toast(message: summary) { services.clearImportSummary() }
                 }
+                if services.downloadBlockedByCellular {
+                    Toast(message: "Waiting for Wi-Fi. Turn on downloads over cellular to fetch this now.") {
+                        services.downloadBlockedByCellular = false
+                    }
+                }
+                // The Mac holds for a download exactly as the phone does — a
+                // record made on one Mac and opened on another is the same
+                // situation — and used to do it in complete silence, looking as
+                // though the play button had not registered.
+                if let waiting = player.awaitingDownloadOf {
+                    Toast(message: "Downloading “\(waiting.title)” — it’ll start in a moment") {
+                        player.abandonPendingItem()
+                    }
+                }
                 if let error = visibleError {
                     ErrorBanner(error: error) {
                         library.lastError = nil
@@ -80,6 +94,7 @@ struct MacRootView: View {
         }
         .animation(DubplateMotion.standard, value: library.lastError?.id)
         .animation(DubplateMotion.standard, value: services.lastImportSummary)
+        .animation(DubplateMotion.standard, value: player.awaitingDownloadOf?.id)
         .sheet(isPresented: $isShowingNewRelease) {
             NewReleaseSheet(
                 defaultArtistName: library.defaultArtistName,

@@ -78,10 +78,45 @@ extension PlayerController {
     /// extrapolates it from the rate, and republishing on a timer costs an XPC round
     /// trip several times a second for the length of a record.
     func tick() {
-        guard isPlaying else { return }
-        if scrubTime == nil {
-            currentTime = engine.currentTime
+        guard isPlaying else {
+            lastAdvance = nil
+            return
         }
+        let position = engine.currentTime
+        if scrubTime == nil {
+            currentTime = position
+        }
+        checkForStall(at: position)
+    }
+
+    /// Gives up on a track that has stopped rendering without finishing.
+    ///
+    /// A WAV whose header promises five minutes and whose data chunk holds thirty
+    /// seconds — a bounce interrupted by a full disk, or a file copied out of a
+    /// share that dropped — renders what it has and then stops. The completion
+    /// handler never fires, because those frames were never played back, so the
+    /// transport went on counting towards a length that did not exist for as long
+    /// as the application stayed open. Three seconds of a still playhead while the
+    /// transport claims to be playing is not a thing that happens to a good file.
+    private func checkForStall(at position: TimeInterval) {
+        guard let last = lastAdvance else {
+            lastAdvance = (position, Date())
+            return
+        }
+        guard abs(position - last.position) < 0.05 else {
+            lastAdvance = (position, Date())
+            return
+        }
+        guard Date().timeIntervalSince(last.at) >= Self.stallTimeout else { return }
+
+        lastAdvance = nil
+        guard let stalled = queue.current else { return }
+        Log.audio.error("Playback stalled; treating the track as finished")
+        report(DubplateError(.unreadableAudio, subject: stalled.title))
+        // Not `handleItemFinished`: whatever was scheduled behind this track is
+        // stuck behind it on the same node and would not start either. The next
+        // track has to be scheduled fresh.
+        advancePastStalledItem()
     }
 
     /// Called when a cover changes, so the Lock Screen does not keep the old one.

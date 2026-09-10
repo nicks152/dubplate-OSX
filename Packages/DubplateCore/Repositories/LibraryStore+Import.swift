@@ -124,7 +124,8 @@ extension LibraryStore {
         guard total > 0 else { return outcome }
 
         var completed = 0
-        setImportProgress(ImportProgress(completed: 0, total: total))
+        let ticket = beginImport(total: total)
+        defer { endImport(ticket) }
 
         for planned in plan.newTracks {
             var createdTrack: Track?
@@ -132,7 +133,8 @@ extension LibraryStore {
                 // A merge from another device can delete the release mid-import;
                 // touching an invalidated model is a trap, not an error.
                 if let release, release.isDeleted { break }
-                setImportProgress(
+                updateImport(
+                    ticket,
                     ImportProgress(completed: completed, total: total, currentFilename: candidate.filename)
                 )
                 guard let ingested = await ingest(candidate, target: createdTrack, into: &outcome) else {
@@ -157,7 +159,8 @@ extension LibraryStore {
         }
 
         for planned in plan.newVersions {
-            setImportProgress(
+            updateImport(
+                ticket,
                 ImportProgress(completed: completed, total: total, currentFilename: planned.candidate.filename)
             )
             completed += 1
@@ -170,14 +173,16 @@ extension LibraryStore {
 
         if let release, !release.isDeleted {
             for candidate in plan.artwork {
-                setImportProgress(
+                updateImport(
+                    ticket,
                     ImportProgress(completed: completed, total: total, currentFilename: candidate.filename)
                 )
                 completed += 1
                 await setArtwork(from: candidate.url, for: release)
             }
             for candidate in plan.motion {
-                setImportProgress(
+                updateImport(
+                    ticket,
                     ImportProgress(completed: completed, total: total, currentFilename: candidate.filename)
                 )
                 completed += 1
@@ -186,7 +191,6 @@ extension LibraryStore {
             release.normalizeOrder()
         }
 
-        setImportProgress(nil)
         save()
         return outcome
     }
@@ -200,8 +204,9 @@ extension LibraryStore {
     ) async -> ImportOutcome {
         var outcome = ImportOutcome()
         let candidate = ImportCandidate.make(url: url, dropIndex: 0)
-        setImportProgress(ImportProgress(completed: 0, total: 1, currentFilename: candidate.filename))
-        defer { setImportProgress(nil) }
+        let ticket = beginImport(total: 1)
+        updateImport(ticket, ImportProgress(completed: 0, total: 1, currentFilename: candidate.filename))
+        defer { endImport(ticket) }
         guard !track.isDeleted else { return outcome }
 
         switch choice {

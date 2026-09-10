@@ -59,6 +59,12 @@ public final class PlayerController {
     /// True when the music was last heard through something other than the phone's
     /// own speaker. Consulted before a rebuilt graph is restarted.
     var wasPlayingOnExternalRoute = false
+    /// The last position the engine reported moving to, and when. Used to notice a
+    /// track that has stopped rendering without ever finishing.
+    var lastAdvance: (position: TimeInterval, at: Date)?
+    /// How long the playhead may stand still before the track is given up on.
+    static let stallTimeout: TimeInterval = 3
+
     /// Tracks passed over because their audio would not play, since the last thing
     /// the person actually asked for. Without it, repeat plus a record whose files
     /// have not arrived is a queue that never stops turning.
@@ -219,6 +225,7 @@ public final class PlayerController {
         do {
             try engine.seek(to: clamped)
             currentTime = clamped
+            lastAdvance = nil
             // Anything scheduled behind the current item is now anchored to the
             // wrong sample position, so let it be re-queued from the new one.
             enqueuedItemIDs.removeAll()
@@ -330,6 +337,7 @@ public final class PlayerController {
             try engine.start(item: item.id, file: file, at: offset)
             isPlaying = true
             currentTime = offset
+            lastAdvance = nil
             wasPlayingOnExternalRoute = !session.isRoutedToBuiltInSpeaker
             skippedSinceUserAction.removeAll()
             enqueuedItemIDs = [item.id]
@@ -374,6 +382,20 @@ public final class PlayerController {
             stopTicking()
             skippedSinceUserAction.removeAll()
             report(DubplateError(.playbackFailed, subject: failed.title))
+            refreshNowPlaying()
+            return
+        }
+        startCurrentItem(from: 0)
+    }
+
+    /// Moves to the next track after the current one stopped rendering, rebuilding
+    /// the schedule rather than trusting anything already on the node.
+    func advancePastStalledItem() {
+        enqueuedItemIDs.removeAll()
+        guard queue.advance() else {
+            engine.stop()
+            isPlaying = false
+            stopTicking()
             refreshNowPlaying()
             return
         }

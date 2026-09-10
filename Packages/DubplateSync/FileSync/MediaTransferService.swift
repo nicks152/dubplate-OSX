@@ -35,6 +35,8 @@ public actor MediaTransferService {
 
     private var active: [UUID: Transfer] = [:]
     private var cancelled: Set<UUID> = []
+    private var isPublishingProgress = false
+    private var progressIsStale = false
 
     public var onProgress: (@Sendable ([Transfer]) async -> Void)?
     public var onAvailabilityChanged: (@Sendable (UUID, AvailabilityState) async -> Void)?
@@ -293,13 +295,34 @@ public actor MediaTransferService {
 
     private func begin(_ transfer: Transfer) {
         active[transfer.id] = transfer
-        let snapshot = Array(active.values)
-        Task { [onProgress] in await onProgress?(snapshot) }
+        publishProgress()
     }
 
     private func finish(_ assetID: UUID) {
         active[assetID] = nil
-        let snapshot = Array(active.values)
-        Task { [onProgress] in await onProgress?(snapshot) }
+        publishProgress()
+    }
+
+    /// Tells whoever is listening what is moving, in order and one at a time.
+    ///
+    /// A task per event meant a backfill of several hundred files spawned a
+    /// thousand unordered tasks, and they delivered their snapshots in whatever
+    /// order they happened to run — so the last thing the interface heard could be
+    /// a stale non-empty list, leaving "Syncing" on screen after everything had
+    /// finished. One notifier drains the state, coalescing anything that happened
+    /// while it was away.
+    private func publishProgress() {
+        progressIsStale = true
+        guard !isPublishingProgress else { return }
+        isPublishingProgress = true
+        Task { await self.drainProgress() }
+    }
+
+    private func drainProgress() async {
+        while progressIsStale {
+            progressIsStale = false
+            await onProgress?(Array(active.values))
+        }
+        isPublishingProgress = false
     }
 }

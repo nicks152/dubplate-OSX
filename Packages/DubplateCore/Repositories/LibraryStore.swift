@@ -17,8 +17,10 @@ public final class LibraryStore {
 
     /// The most recent thing that went wrong, for the interface to present once.
     public var lastError: DubplateError?
-    /// Non-nil while files are being brought in.
+    /// Non-nil while files are being brought in. The sum of every drop in flight.
     public private(set) var importProgress: ImportProgress?
+    /// Drops in flight, oldest first.
+    private var running: [(ticket: UUID, progress: ImportProgress)] = []
     /// Called when a release's cover changes, so cached renditions — including the
     /// one on the Lock Screen — can be thrown away.
     public var artworkDidChange: ((UUID) -> Void)?
@@ -332,8 +334,43 @@ public final class LibraryStore {
         commit()
     }
 
-    func setImportProgress(_ progress: ImportProgress?) {
-        importProgress = progress
+    /// Registers a drop that is starting, and hands back its ticket.
+    ///
+    /// Two drops can be in flight at once — a producer drags a bounce folder in and
+    /// then remembers the cover — and a single slot meant the first one to finish
+    /// hid the second one's progress, leaving a window that looked idle while it
+    /// was still copying gigabytes.
+    func beginImport(total: Int) -> UUID {
+        let ticket = UUID()
+        running.append((ticket, ImportProgress(completed: 0, total: total)))
+        publishImportProgress()
+        return ticket
+    }
+
+    func updateImport(_ ticket: UUID, _ progress: ImportProgress) {
+        guard let index = running.firstIndex(where: { $0.ticket == ticket }) else { return }
+        running[index].progress = progress
+        publishImportProgress()
+    }
+
+    func endImport(_ ticket: UUID) {
+        running.removeAll { $0.ticket == ticket }
+        publishImportProgress()
+    }
+
+    private func publishImportProgress() {
+        guard !running.isEmpty else {
+            importProgress = nil
+            return
+        }
+        // One bar for everything in flight, named after the oldest drop that is
+        // still working — a line can only carry one filename, and the drop that
+        // started first is the one someone is waiting on.
+        let completed = running.reduce(0) { $0 + $1.progress.completed }
+        let total = running.reduce(0) { $0 + $1.progress.total }
+        let filename = running.first { $0.progress.completed < $0.progress.total }?
+            .progress.currentFilename ?? ""
+        importProgress = ImportProgress(completed: completed, total: total, currentFilename: filename)
     }
 }
 
