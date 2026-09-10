@@ -27,9 +27,15 @@ struct DubplateMacApp: App {
 
         Settings {
             MacSettingsView()
+                // A Settings scene has its own root and inherits nothing from the
+                // window group, so everything it could reach has to be supplied here.
                 .environment(services)
-                .environment(services.settings)
+                .environment(services.library)
+                .environment(services.player)
+                .environment(services.artwork)
                 .environment(services.sync)
+                .environment(services.settings)
+                .modelContainer(services.container)
         }
     }
 }

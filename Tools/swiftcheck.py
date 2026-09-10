@@ -391,6 +391,70 @@ def check_swiftdata_models(module: Module, sources: dict[str, str], findings: li
                         "for CloudKit mirroring"))
 
 
+ENVIRONMENT_USE_RE = re.compile(r"@Environment\(\s*([A-Z][A-Za-z0-9_]*)\.self\s*\)")
+ENVIRONMENT_INJECT_RE = re.compile(r"\.environment\(\s*([A-Za-z0-9_.]+)")
+
+
+def check_environment_objects(modules: list[Module], sources: dict[str, str],
+                              findings: list[Finding]) -> None:
+    """Every `@Environment(X.self)` needs an `.environment(…)` that supplies an X.
+
+    A missing injection is not a compile error — it is a crash the first time the
+    view appears, which is exactly the kind of thing that survives a code review and
+    does not survive a demo.
+
+    Checked per application, because the shared views in DubplateUI are hosted by
+    both: an object injected by the Mac and forgotten by the phone would otherwise
+    look fine.
+    """
+    aliases = {
+        "AppServices": {"services"},
+        "LibraryStore": {"library"},
+        "PlayerController": {"player"},
+        "ArtworkLoader": {"artwork"},
+        "SyncCoordinator": {"sync"},
+        "DubplateSettings": {"settings"},
+    }
+
+    def injections(module: Module) -> set[str]:
+        found: set[str] = set()
+        for path in module.files:
+            for match in ENVIRONMENT_INJECT_RE.finditer(sources[path]):
+                # Without type inference the property name is the only clue, so both
+                # the expression's last component and its capitalised form count.
+                leaf = match.group(1).split(".")[-1]
+                found.add(leaf)
+                found.add(leaf[:1].upper() + leaf[1:])
+        return found
+
+    def uses(module: Module) -> list[tuple[str, str, int]]:
+        found = []
+        for path in module.files:
+            code = sources[path]
+            for match in ENVIRONMENT_USE_RE.finditer(code):
+                found.append((match.group(1), path, code[: match.start()].count("\n") + 1))
+        return found
+
+    by_name = {m.name: m for m in modules}
+    shared = by_name.get("DubplateUI")
+
+    for app_name in ["DubplateMac", "DubplateiOS"]:
+        app = by_name.get(app_name)
+        if app is None:
+            continue
+        supplied = injections(app)
+        if shared is not None:
+            supplied |= injections(shared)
+        required = uses(app) + (uses(shared) if shared is not None else [])
+        for name, path, line in required:
+            candidates = {name, name[:1].lower() + name[1:]} | aliases.get(name, set())
+            if candidates & supplied:
+                continue
+            findings.append(Finding(
+                "error", rel(path), line, "environment",
+                f"@Environment({name}.self) is read but {app_name} injects no {name}"))
+
+
 STYLE_RULES = [
     (re.compile(r"(?<![\w\"!?])try!"), "force-try", "warn", "`try!` — prefer explicit handling"),
     (re.compile(r"\bas!\s"), "force-cast", "warn", "`as!` — prefer conditional cast"),
@@ -455,6 +519,7 @@ def main() -> int:
 
     for module in modules:
         collect_declarations(module, sources, findings)
+    check_environment_objects(modules, sources, findings)
     for module in modules:
         check_imports(module, sources, first_party, allow, findings)
         check_type_references(module, by_name, sources, allow, findings)
