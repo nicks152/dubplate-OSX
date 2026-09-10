@@ -281,6 +281,13 @@ extension MediaSyncEngine: CKSyncEngineDelegate {
             return
         }
 
+        // A description record says some device described this file. It does not
+        // say the audio is in iCloud — descriptions routinely arrive before bytes,
+        // and "uploaded" is the flag that authorises deleting a local master. So
+        // claim it only where this device has no copy to upload anyway; where it
+        // does, its own record of whether its upload finished is the truth, and
+        // `record` merges rather than overwrites it.
+        let hereAlready = mediaStore.exists(relativePath: relativePath)
         await index.record(
             MediaDescriptor(
                 assetID: assetID,
@@ -289,11 +296,12 @@ extension MediaSyncEngine: CKSyncEngineDelegate {
                 originalFilename: record[Field.originalFilename] as? String ?? "",
                 checksum: record[Field.checksum] as? String ?? "",
                 fileSize: record[Field.fileSize] as? Int64 ?? 0,
-                isUploaded: true
+                isDescribed: true,
+                isUploaded: !hereAlready
             )
         )
 
-        if mediaStore.exists(relativePath: relativePath) {
+        if hereAlready {
             await onAssetArrived?(assetID, relativePath)
             await onAvailabilityChanged?(assetID, .available)
         } else {
