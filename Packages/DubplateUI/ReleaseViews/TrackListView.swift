@@ -13,6 +13,8 @@ public struct TrackListView: View {
     private let playingVersionID: UUID?
     private let allowsReordering: Bool
     @Binding private var selection: UUID?
+    @State private var hasAppeared = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let onPlay: (Track) -> Void
     private let onMove: ((IndexSet, Int) -> Void)?
     private let onDropAudio: ((Track, [URL]) -> Void)?
@@ -101,6 +103,14 @@ public struct TrackListView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .animation(DubplateMotion.standard, value: tracks.map(\.id))
+        .opacity(hasAppeared ? 1 : 0)
+        .onAppear {
+            // A record arriving all at once is a table refreshing. Arriving is worth
+            // a beat — one, not a cascade.
+            withAnimation(DubplateMotion.respecting(reduceMotion, DubplateMotion.standard)) {
+                hasAppeared = true
+            }
+        }
     }
 
     /// Names what will actually be destroyed, because "Remove from Release" did not.

@@ -15,6 +15,9 @@ import DubplateUI
 /// puts the transport out of reach at exactly the wrong moment.
 struct ReleaseDetailScreen: View {
     let release: Release
+    /// True when this record was just made from a folder drop and still has the
+    /// folder's name.
+    var focusesTitleOnAppear: Bool = false
 
     @Environment(AppServices.self) private var services
     @Environment(LibraryStore.self) private var library
@@ -94,7 +97,7 @@ struct ReleaseDetailScreen: View {
             titleVisibility: .visible
         ) {
             Button("Replace Cover") {
-                if let url = pendingArtwork { Task { await setArtwork(url) } }
+                if let url = pendingArtwork { Task { await setArtwork(url, announcing: "Cover replaced") } }
                 pendingArtwork = nil
             }
             Button("Cancel", role: .cancel) { pendingArtwork = nil }
@@ -115,7 +118,7 @@ struct ReleaseDetailScreen: View {
             }
             Button("Cancel", role: .cancel) { trackToDelete = nil }
         } message: {
-            Text("Every mix of it leaves this Mac and your iCloud. This can’t be undone.")
+            Text("Deleted from this Mac and from iCloud. This can’t be undone.")
         }
         .alert("Rename Mix", isPresented: Binding(get: { renamingVersion != nil }, set: { if !$0 { renamingVersion = nil } })) {
             TextField("Label", text: $draftText)
@@ -166,6 +169,7 @@ struct ReleaseDetailScreen: View {
                 release: release,
                 layout: .horizontal,
                 isEditable: true,
+                focusesTitleOnAppear: focusesTitleOnAppear,
                 onPlay: { services.play(release: release) },
                 onShuffle: { services.play(release: release, shuffled: true) },
                 onEditArtwork: { isChoosingArtwork = true },
@@ -176,7 +180,7 @@ struct ReleaseDetailScreen: View {
             if let warning = sampleRateWarning {
                 SequenceWarning(message: warning)
                     .padding(.horizontal, DubplateLayout.xxl)
-                    .padding(.bottom, DubplateLayout.m)
+                    .padding(.bottom, DubplateLayout.s)
             }
 
             if release.trackCount == 0 {
@@ -214,13 +218,13 @@ struct ReleaseDetailScreen: View {
     @ViewBuilder
     private func inspectorPane(for track: Track) -> some View {
         VStack(spacing: 0) {
-            Picker("", selection: $inspector) {
-                Text("Track").tag(InspectorMode.track)
-                Text("Mixes (\(track.versionCount))").tag(InspectorMode.versions)
+            HStack(spacing: DubplateLayout.xl) {
+                inspectorTab("Track", mode: .track)
+                inspectorTab("\(track.versionCount) mixes", mode: .versions)
+                Spacer(minLength: 0)
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .padding(DubplateLayout.m)
+            .padding(.horizontal, DubplateLayout.l)
+            .padding(.vertical, DubplateLayout.m)
 
             Divider().overlay(DubplateColor.hairline)
 
@@ -261,6 +265,25 @@ struct ReleaseDetailScreen: View {
             }
         }
         .background(DubplateColor.raised)
+    }
+
+    /// Two words and a rule, rather than a system segmented control rendered in the
+    /// user's accent colour.
+    private func inspectorTab(_ title: String, mode: InspectorMode) -> some View {
+        Button {
+            inspector = mode
+        } label: {
+            VStack(spacing: 5) {
+                Text(title)
+                    .dubplateLabelStyle(inspector == mode ? DubplateColor.primaryText : DubplateColor.tertiaryText)
+                Rectangle()
+                    .fill(inspector == mode ? DubplateColor.primaryText : .clear)
+                    .frame(height: 2)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(inspector == mode ? .isSelected : [])
     }
 
     private var selectedTrack: Track? {
@@ -335,8 +358,14 @@ struct ReleaseDetailScreen: View {
         guard !images.isEmpty || !audio.isEmpty || !videos.isEmpty else { return false }
 
         if let image = images.first {
-            // Never silently: replacing a cover deletes the old file.
-            pendingArtwork = image
+            if release.artwork == nil {
+                // Nothing can be lost, and this is the moment a folder becomes a
+                // record. It should not be answered with a dialog about a filename.
+                Task { await setArtwork(image, announcing: "Cover set") }
+            } else {
+                // Replacing deletes the old file, so that one asks.
+                pendingArtwork = image
+            }
         }
         if !audio.isEmpty || !videos.isEmpty {
             let plan = library.plan(for: audio + videos, in: release)
@@ -379,10 +408,11 @@ struct ReleaseDetailScreen: View {
         }
     }
 
-    private func setArtwork(_ url: URL) async {
+    private func setArtwork(_ url: URL, announcing message: String? = nil) async {
         await library.setArtwork(from: url, for: release)
         services.artwork.invalidateAll()
         await services.registerNewMedia(in: release)
+        if let message { services.announce(message) }
     }
 }
 
@@ -411,22 +441,18 @@ struct IdentifiedPlan: Identifiable {
 }
 
 /// A quiet line above the sequence about something that will be audible.
+///
+/// A line, not a banner. Filling it and giving it an icon made a technical note the
+/// second-loudest thing on the page, which is not what it is worth.
 struct SequenceWarning: View {
     let message: String
 
     var body: some View {
-        HStack(spacing: DubplateLayout.s) {
-            Image(systemName: "waveform.badge.exclamationmark")
-                .font(.system(size: 12))
-            Text(message)
-                .font(DubplateType.metadata)
-            Spacer(minLength: 0)
-        }
-        .foregroundStyle(DubplateColor.secondaryText)
-        .padding(.horizontal, DubplateLayout.m)
-        .padding(.vertical, DubplateLayout.s)
-        .background(DubplateColor.sunken, in: RoundedRectangle(cornerRadius: DubplateLayout.controlRadius, style: .continuous))
-        .accessibilityElement(children: .combine)
+        Text(message)
+            .font(DubplateType.metadata)
+            .foregroundStyle(DubplateColor.secondaryText)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
     }
 }
 

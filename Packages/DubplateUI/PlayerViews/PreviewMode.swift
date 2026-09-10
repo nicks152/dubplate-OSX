@@ -31,12 +31,4 @@ public enum PreviewMode: String, CaseIterable, Identifiable, Sendable {
         case .motion: return "Full-screen visual. How it feels on a phone held up."
         }
     }
-
-    public var symbolName: String {
-        switch self {
-        case .stream: return "rectangle.portrait"
-        case .gallery: return "square.grid.2x2"
-        case .motion: return "play.rectangle"
-        }
-    }
 }

@@ -112,15 +112,12 @@ public struct VersionListView: View {
             Spacer(minLength: DubplateLayout.s)
 
             if !isCurrent {
-                Button("Make Current") { onMakeCurrent(version) }
+                Button("Use This Mix") { onMakeCurrent(version) }
                     .buttonStyle(DubplateQuietButtonStyle())
                     .controlSize(.small)
             }
 
             Menu {
-                if !isCurrent {
-                    Button("Make Current") { onMakeCurrent(version) }
-                }
                 if let onRename {
                     Button("Rename…") { onRename(version) }
                 }
@@ -134,7 +131,7 @@ public struct VersionListView: View {
                 }
                 if let onDelete {
                     Divider()
-                    Button("Delete Version", role: .destructive) { onDelete(version) }
+                    Button("Delete Mix", role: .destructive) { onDelete(version) }
                         .disabled(track.versionCount <= 1)
                 }
             } label: {

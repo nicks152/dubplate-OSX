@@ -21,13 +21,13 @@ struct PhoneHomeScreen: View {
                 } else {
                     if let recent = mostRecent {
                         VStack(alignment: .leading, spacing: DubplateLayout.m) {
-                            SectionHeader(recent.lastPlayedAt == nil ? "Newest" : "Recently Played")
+                            SectionHeader(recent.lastPlayedAt == nil ? "Newest" : "Last Played")
                             featured(recent)
                         }
                     }
                     if !otherRecents.isEmpty {
                         VStack(alignment: .leading, spacing: DubplateLayout.m) {
-                            SectionHeader("Recently Played")
+                            SectionHeader("Before That")
                             ReleaseShelf(releases: otherRecents) { open($0) }
                         }
                     }
@@ -35,12 +35,12 @@ struct PhoneHomeScreen: View {
                 }
             }
             .padding(.horizontal, DubplateLayout.l)
-            .padding(.bottom, 120)
+            .padding(.bottom, DubplateLayout.xl)
         }
         .background(DubplateColor.ground)
         .navigationTitle("Dubplate")
         .navigationBarTitleDisplayMode(.large)
-        .searchable(text: $searchText, prompt: "Releases, tracks, filenames")
+        .searchable(text: $searchText, prompt: "Records, tracks, artists")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 NavigationLink {
@@ -80,7 +80,7 @@ struct PhoneHomeScreen: View {
                 ArtworkView(
                     asset: release.artwork,
                     title: release.title,
-                    cornerRadius: DubplateLayout.largeArtworkRadius
+                    cornerRadius: DubplateLayout.artworkRadius
                 )
                 // Capped rather than full-bleed, so the shelf underneath is
                 // visible without scrolling — a library should look like a library.
@@ -96,7 +96,7 @@ struct PhoneHomeScreen: View {
                 } label: {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(release.title.isEmpty ? "Untitled" : release.title)
-                            .dubplateDisplayStyle(size: 26)
+                            .dubplateDisplayStyle(.screen)
                             .foregroundStyle(DubplateColor.primaryText)
                         Text(release.artistName)
                             .font(.system(size: 15))
@@ -127,10 +127,11 @@ struct PhoneHomeScreen: View {
 
     private var yourMusic: some View {
         VStack(alignment: .leading, spacing: DubplateLayout.m) {
-            SectionHeader("Your Music")
+            SectionHeader("Records")
             LibraryGrid(
                 releases: releases,
                 playingReleaseID: player.currentItem?.releaseID,
+                isPlaying: player.isPlaying,
                 onOpen: { open($0) },
                 onPlay: { services.play(release: $0) }
             )

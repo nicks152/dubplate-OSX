@@ -16,19 +16,29 @@ public enum DubplateLayout {
     public static let xxl: CGFloat = 32
     public static let xxxl: CGFloat = 48
 
-    /// Artwork corners. Small: a sleeve is square, not a rounded app icon.
-    public static let artworkRadius: CGFloat = 6
-    public static let largeArtworkRadius: CGFloat = 10
+    /// Artwork corners. A sleeve is square, not a rounded app icon — and it is the
+    /// same object at every size, so it does not change shape by context.
     public static let controlRadius: CGFloat = 8
+
+    public static func artworkRadius(forEdge edge: CGFloat) -> CGFloat {
+        edge <= 48 ? 3 : 4
+    }
+
+    /// The default for a card-sized cover.
+    public static let artworkRadius: CGFloat = 4
     public static let sheetRadius: CGFloat = 14
 
     /// Minimum hit target. Below this nothing is tappable.
     public static let minimumTapTarget: CGFloat = 44
 
     /// Grid metrics for the library.
-    public static let gridMinimumCardWidth: CGFloat = 168
-    public static let gridMaximumCardWidth: CGFloat = 260
-    public static let gridSpacing: CGFloat = 20
+    ///
+    /// `adaptive` packs the most columns it can at the *minimum* width, so the
+    /// ceiling is only ever reached when one more column will not fit — a 168pt
+    /// floor meant 170pt covers on a 27" display as well as on a laptop.
+    public static let gridMinimumCardWidth: CGFloat = 220
+    public static let gridMaximumCardWidth: CGFloat = 300
+    public static let gridSpacing: CGFloat = 24
 
     /// Track row height on each platform.
     #if os(macOS)

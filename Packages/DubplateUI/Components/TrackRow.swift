@@ -10,7 +10,6 @@ public struct TrackRow: View {
     private let track: Track
     private let isCurrent: Bool
     private let isPlaying: Bool
-    private let showsArtwork: Bool
     private let playingVersionID: UUID?
     private let onPlay: () -> Void
     private let onShowVersions: (() -> Void)?
@@ -21,7 +20,6 @@ public struct TrackRow: View {
         track: Track,
         isCurrent: Bool = false,
         isPlaying: Bool = false,
-        showsArtwork: Bool = false,
         playingVersionID: UUID? = nil,
         onPlay: @escaping () -> Void,
         onShowVersions: (() -> Void)? = nil
@@ -29,21 +27,17 @@ public struct TrackRow: View {
         self.track = track
         self.isCurrent = isCurrent
         self.isPlaying = isPlaying
-        self.showsArtwork = showsArtwork
         self.playingVersionID = playingVersionID
         self.onPlay = onPlay
         self.onShowVersions = onShowVersions
     }
 
     public var body: some View {
-        HStack(spacing: DubplateLayout.m) {
+        HStack(spacing: 14) {
+            // Right-aligned monospaced digits, so 1 and 10 share an edge beside a
+            // hard-aligned title column.
             leading
-                .frame(width: 26, alignment: .center)
-
-            if showsArtwork {
-                ArtworkView(asset: track.release?.artwork, title: track.release?.title ?? track.displayTitle)
-                    .frame(width: 38, height: 38)
-            }
+                .frame(width: 22, alignment: .trailing)
 
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: DubplateLayout.s) {
@@ -66,17 +60,11 @@ public struct TrackRow: View {
             Spacer(minLength: DubplateLayout.s)
 
             if track.versionCount > 1 {
-                let pill = VersionPill(
+                VersionPill(
                     count: track.versionCount,
-                    label: displayedVersion?.shortName ?? "",
+                    currentLabel: displayedVersion?.listeningLabel ?? "",
                     isAuditioning: isAuditioning
                 )
-                if let onShowVersions {
-                    Button(action: onShowVersions) { pill }
-                        .buttonStyle(.plain)
-                } else {
-                    pill
-                }
             }
 
             AvailabilityBadge(state: track.availability)
@@ -85,6 +73,23 @@ public struct TrackRow: View {
                 .font(DubplateType.metadata)
                 .foregroundStyle(DubplateColor.tertiaryText)
                 .frame(minWidth: 40, alignment: .trailing)
+
+            // Reserved on every row, so a row with mixes does not pull its duration
+            // inboard of the rows above and below it.
+            if let onShowVersions {
+                Button(action: onShowVersions) {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(DubplateColor.tertiaryText)
+                        .frame(width: DubplateLayout.minimumTapTarget, height: DubplateLayout.minimumTapTarget)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .opacity(track.versionCount > 1 ? 1 : 0)
+                .allowsHitTesting(track.versionCount > 1)
+                .accessibilityLabel("Mixes of \(track.displayTitle)")
+                .accessibilityHidden(track.versionCount <= 1)
+            }
         }
         .frame(minHeight: DubplateLayout.trackRowHeight)
         .contentShape(Rectangle())
@@ -156,12 +161,13 @@ public struct TrackRow: View {
 /// that is meant to read like a track list.
 public struct VersionPill: View {
     private let count: Int
-    private let label: String
+    /// Not drawn — spoken. The pill says how many; VoiceOver says which.
+    private let currentLabel: String
     private let isAuditioning: Bool
 
-    public init(count: Int, label: String, isAuditioning: Bool = false) {
+    public init(count: Int, currentLabel: String = "", isAuditioning: Bool = false) {
         self.count = count
-        self.label = label
+        self.currentLabel = currentLabel
         self.isAuditioning = isAuditioning
     }
 
@@ -173,7 +179,7 @@ public struct VersionPill: View {
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(isAuditioning ? DubplateColor.accent : DubplateColor.sunken, in: Capsule())
-            .accessibilityLabel("\(count) mixes, currently \(label)")
+            .accessibilityLabel("\(count) mixes, currently \(currentLabel)")
             .accessibilityHint("Shows every mix of this track")
     }
 }

@@ -9,17 +9,20 @@ import DubplateCore
 public struct LibraryGrid: View {
     private let releases: [Release]
     private let playingReleaseID: UUID?
+    private let isPlaying: Bool
     private let onOpen: (Release) -> Void
     private let onPlay: (Release) -> Void
 
     public init(
         releases: [Release],
         playingReleaseID: UUID? = nil,
+        isPlaying: Bool = false,
         onOpen: @escaping (Release) -> Void,
         onPlay: @escaping (Release) -> Void
     ) {
         self.releases = releases
         self.playingReleaseID = playingReleaseID
+        self.isPlaying = isPlaying
         self.onOpen = onOpen
         self.onPlay = onPlay
     }
@@ -38,7 +41,7 @@ public struct LibraryGrid: View {
     }
 
     public var body: some View {
-        LazyVGrid(columns: columns, spacing: DubplateLayout.xxl) {
+        LazyVGrid(columns: columns, spacing: DubplateLayout.gridSpacing) {
             ForEach(releases) { release in
                 Button {
                     onOpen(release)
@@ -46,6 +49,7 @@ public struct LibraryGrid: View {
                     ReleaseCard(
                         release: release,
                         isPlaying: release.id == playingReleaseID,
+                        isAnimatingIndicator: isPlaying,
                         onPlay: { onPlay(release) }
                     )
                 }
@@ -75,8 +79,12 @@ public struct ReleaseShelf: View {
                         onOpen(release)
                     } label: {
                         VStack(alignment: .leading, spacing: DubplateLayout.s) {
-                            ArtworkView(asset: release.artwork, title: release.title)
-                                .frame(width: cardWidth, height: cardWidth)
+                            ArtworkView(
+                                asset: release.artwork,
+                                title: release.title,
+                                artist: release.artistName
+                            )
+                            .frame(width: cardWidth, height: cardWidth)
                             Text(release.title.isEmpty ? "Untitled" : release.title)
                                 .font(DubplateType.cardTitle)
                                 .foregroundStyle(DubplateColor.primaryText)

@@ -34,15 +34,18 @@ public struct StreamModeView: View {
                 ArtworkView(
                     asset: artwork,
                     title: player.currentItem?.releaseTitle ?? "",
-                    cornerRadius: DubplateLayout.largeArtworkRadius
+                    cornerRadius: DubplateLayout.artworkRadius
                 )
                 .frame(width: max(120, artworkEdge), height: max(120, artworkEdge))
                 .shadow(color: .black.opacity(0.5), radius: 34, y: 18)
 
                 VStack(spacing: DubplateLayout.xs) {
-                    Text(player.currentItem?.title ?? "Nothing playing")
+                    // The record, so you know what you are inside.
+                    Text(player.currentItem?.releaseTitle ?? "")
+                        .dubplateLabelStyle(DubplateColor.playerSecondaryText)
+                    Text(player.currentItem?.title ?? "")
                         .font(DubplateType.nowPlayingTitle)
-                        .kerning(-0.4)
+                        .kerning(-0.48)
                         .foregroundStyle(DubplateColor.playerPrimaryText)
                         .lineLimit(2)
                         .multilineTextAlignment(.center)
@@ -66,31 +69,33 @@ public struct StreamModeView: View {
 
                 TransportControls(player: player, size: .regular)
 
-                HStack(spacing: DubplateLayout.xxl) {
-                    if let onShowVersions {
-                        secondaryButton("Versions", systemImage: "square.stack", action: onShowVersions)
-                    }
-                    if let onShowQueue {
-                        secondaryButton("Up Next", systemImage: "list.bullet", action: onShowQueue)
-                    }
-                }
-
-                Spacer(minLength: DubplateLayout.xxxl)
+                Spacer(minLength: DubplateLayout.xxl)
             }
             .frame(maxWidth: .infinity)
+            .overlay(alignment: .topTrailing) {
+                // Two text buttons at the top, rather than a stranded fragment of a
+                // tab bar stacked under the transport.
+                HStack(spacing: DubplateLayout.l) {
+                    if let onShowQueue {
+                        secondaryButton("Up Next", action: onShowQueue)
+                    }
+                    if let onShowVersions {
+                        secondaryButton("Mixes", action: onShowVersions)
+                    }
+                }
+                .padding(.trailing, DubplateLayout.l)
+                .padding(.top, DubplateLayout.s)
+            }
         }
     }
 
-    private func secondaryButton(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+    private func secondaryButton(_ title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 3) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 15))
-                Text(title)
-                    .font(.system(size: 10, weight: .medium))
-            }
-            .foregroundStyle(DubplateColor.playerSecondaryText)
-            .frame(minWidth: DubplateLayout.minimumTapTarget, minHeight: DubplateLayout.minimumTapTarget)
+            Text(title)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(DubplateColor.playerSecondaryText)
+                .frame(minHeight: DubplateLayout.minimumTapTarget)
+                .contentShape(Rectangle())
         }
         .buttonStyle(PressableButtonStyle())
     }

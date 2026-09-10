@@ -39,7 +39,7 @@ public struct ImportPlanSheet: View {
         VStack(alignment: .leading, spacing: DubplateLayout.xl) {
             VStack(alignment: .leading, spacing: DubplateLayout.xs) {
                 Text("Adding to \(releaseTitle)")
-                    .dubplateDisplayStyle(size: 22)
+                    .dubplateDisplayStyle(.sheet)
                     .foregroundStyle(DubplateColor.primaryText)
                 Text(plan.summary)
                     .font(DubplateType.metadata)
@@ -50,7 +50,7 @@ public struct ImportPlanSheet: View {
                 VStack(alignment: .leading, spacing: DubplateLayout.xl) {
                     if !plan.newVersions.isEmpty {
                         VStack(alignment: .leading, spacing: DubplateLayout.s) {
-                            SectionHeader("Looks like new versions")
+                            SectionHeader("New mixes")
                             ForEach(plan.newVersions) { planned in
                                 versionRow(planned)
                             }
@@ -88,7 +88,7 @@ public struct ImportPlanSheet: View {
                     }
                     if !plan.rejected.isEmpty {
                         VStack(alignment: .leading, spacing: DubplateLayout.s) {
-                            SectionHeader("Skipped")
+                            SectionHeader("Not added")
                             ForEach(plan.rejected) { rejected in
                                 Text("\(rejected.filename) — \(rejected.reason)")
                                     .font(DubplateType.metadata)

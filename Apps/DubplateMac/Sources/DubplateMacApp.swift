@@ -19,11 +19,31 @@ struct DubplateMacApp: App {
                 .environment(services.settings)
                 .modelContainer(services.container)
                 .preferredColorScheme(services.settings.appearance.colorScheme)
+                // Without this the segmented picker, the switches, the progress bar,
+                // the sidebar selection and every focus ring render in the system
+                // accent colour — on the one surface whose palette exists to keep
+                // the interface from competing with the artwork.
+                .tint(DubplateColor.primaryText)
                 .task { await services.start() }
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1180, height: 760)
         .commands { DubplateCommands(services: services) }
+
+        // A preview you can leave open beside the record is worth more than a modal,
+        // and a 900pt sheet does not fit the laptop most producers own.
+        Window("iPhone", id: DubplateWindow.phonePreview) {
+            PhonePreviewWindow()
+                .environment(services)
+                .environment(services.library)
+                .environment(services.player)
+                .environment(services.artwork)
+                .environment(services.settings)
+                .modelContainer(services.container)
+                .tint(DubplateColor.primaryText)
+        }
+        .defaultSize(width: 480, height: 920)
+        .keyboardShortcut("p", modifiers: [.command, .shift])
 
         Settings {
             MacSettingsView()
@@ -36,8 +56,13 @@ struct DubplateMacApp: App {
                 .environment(services.sync)
                 .environment(services.settings)
                 .modelContainer(services.container)
+                .tint(DubplateColor.primaryText)
         }
     }
+}
+
+enum DubplateWindow {
+    static let phonePreview = "phone-preview"
 }
 
 /// Menu bar commands.
@@ -83,10 +108,9 @@ struct DubplateCommands: Commands {
         }
 
         CommandGroup(after: .toolbar) {
-            Button("Phone Preview") {
+            Button("Show iPhone") {
                 NotificationCenter.default.post(name: .dubplateTogglePreview, object: nil)
             }
-            .keyboardShortcut("p", modifiers: [.command, .shift])
         }
     }
 }

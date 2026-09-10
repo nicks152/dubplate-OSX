@@ -25,11 +25,21 @@ public struct TransportControls: View {
             }
         }
 
+        /// Every control carries the same outer frame, so the frames provide the
+        /// optical gap and the spacing between them is small.
+        var frame: CGFloat {
+            switch self {
+            case .compact: return 44
+            case .regular: return 52
+            case .large: return 68
+            }
+        }
+
         var spacing: CGFloat {
             switch self {
-            case .compact: return DubplateLayout.m
-            case .regular: return DubplateLayout.xl
-            case .large: return DubplateLayout.xxl
+            case .compact: return DubplateLayout.xs
+            case .regular: return DubplateLayout.m
+            case .large: return DubplateLayout.xl
             }
         }
     }
@@ -79,6 +89,7 @@ public struct TransportControls: View {
                         .offset(x: player.isPlaying ? 0 : size.glyph * 0.06)
                 }
                 .frame(width: size.playDiameter, height: size.playDiameter)
+                .frame(width: size.frame, height: size.frame)
             }
             .buttonStyle(PressableButtonStyle())
             .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
@@ -112,7 +123,8 @@ public struct TransportControls: View {
             Image(systemName: systemName)
                 .font(.system(size: glyphSize, weight: .medium))
                 .foregroundStyle(tint)
-                .frame(minWidth: DubplateLayout.minimumTapTarget, minHeight: DubplateLayout.minimumTapTarget)
+                .frame(width: size.frame, height: size.frame)
+                .contentShape(Rectangle())
         }
         .buttonStyle(PressableButtonStyle())
         .accessibilityLabel(label)

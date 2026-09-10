@@ -49,7 +49,7 @@ public struct MotionModeView: View {
                 VStack(alignment: .leading, spacing: DubplateLayout.xs) {
                     Text(player.currentItem?.releaseTitle ?? "")
                         .dubplateLabelStyle(.white.opacity(0.7))
-                    Text(player.currentItem?.title ?? "Nothing playing")
+                    Text(player.currentItem?.title ?? "")
                         .font(.system(size: 30, weight: .semibold))
                         .kerning(-0.7)
                         .foregroundStyle(.white)
@@ -72,10 +72,10 @@ public struct MotionModeView: View {
                             onScrubEnd: { player.endScrub() }
                         )
                         HStack {
-                            TransportControls(player: player, size: .compact, showsModes: false, tint: .white)
+                            TransportControls(player: player, size: .regular, showsModes: false, tint: .white)
                             Spacer()
                             if let onShowVersions {
-                                Button("Versions", action: onShowVersions)
+                                Button("Mixes", action: onShowVersions)
                                     .buttonStyle(.plain)
                                     .font(.system(size: 12, weight: .medium))
                                     .foregroundStyle(.white.opacity(0.75))
@@ -137,7 +137,6 @@ struct DriftingArtwork: View {
                     x: geometry.size.width / 2 + (drift ? 14 : -14),
                     y: geometry.size.height / 2 + (drift ? -18 : 18)
                 )
-                .blur(radius: 0.5)
                 .onAppear {
                     guard isAnimating else { return }
                     withAnimation(.easeInOut(duration: 22).repeatForever(autoreverses: true)) {

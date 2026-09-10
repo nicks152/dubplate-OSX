@@ -2,11 +2,12 @@ import SwiftUI
 import DubplateCore
 import DubplateAudio
 
-/// Gallery: artwork-forward and editorial.
+/// Gallery: the record as an object.
 ///
-/// Large art, generous space, type that behaves like a printed sleeve — the title
-/// set left, the credit small underneath, the transport reduced to what it has to
-/// be. This is the record as an object.
+/// Not Stream with more margin — that was a spacing variant sold as an environment.
+/// This is the sleeve: the cover, the running order beside or beneath it with the
+/// playing track marked, and the credits a real release carries. It is the mode you
+/// sit with, so it is the one that has something to read.
 public struct GalleryModeView: View {
     private let player: PlayerController
     private let artwork: ArtworkAsset?
@@ -22,26 +23,29 @@ public struct GalleryModeView: View {
         GeometryReader { geometry in
             let isWide = geometry.size.width > geometry.size.height * 1.1
             let artworkEdge = isWide
-                ? geometry.size.height * 0.72
-                : min(geometry.size.width - DubplateLayout.xl * 2, geometry.size.height * 0.56)
+                ? geometry.size.height * 0.64
+                : min(geometry.size.width - DubplateLayout.xl * 2, geometry.size.height * 0.42)
 
             Group {
                 if isWide {
-                    HStack(spacing: DubplateLayout.xxxl) {
+                    HStack(alignment: .top, spacing: DubplateLayout.xxxl) {
                         art(edge: artworkEdge)
-                        details(alignment: .leading)
-                            .frame(maxWidth: 380)
+                        ScrollView {
+                            details(alignment: .leading)
+                        }
+                        .frame(maxWidth: 420)
                     }
                     .padding(DubplateLayout.xxxl)
                 } else {
-                    VStack(alignment: .leading, spacing: DubplateLayout.xxl) {
-                        Spacer(minLength: 0)
-                        art(edge: artworkEdge)
-                            .frame(maxWidth: .infinity)
-                        details(alignment: .leading)
-                        Spacer(minLength: DubplateLayout.xxxl)
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: DubplateLayout.xl) {
+                            art(edge: artworkEdge)
+                                .frame(maxWidth: .infinity)
+                            details(alignment: .leading)
+                        }
+                        .padding(.horizontal, DubplateLayout.xl)
+                        .padding(.vertical, DubplateLayout.xxl)
                     }
-                    .padding(.horizontal, DubplateLayout.xl)
                 }
             }
         }
@@ -51,7 +55,7 @@ public struct GalleryModeView: View {
         ArtworkView(
             asset: artwork,
             title: player.currentItem?.releaseTitle ?? "",
-            cornerRadius: 2
+            cornerRadius: 4
         )
         .frame(width: max(140, edge), height: max(140, edge))
         .shadow(color: .black.opacity(0.55), radius: 44, y: 24)
@@ -63,23 +67,16 @@ public struct GalleryModeView: View {
                 Text(player.currentItem?.releaseTitle ?? "")
                     .dubplateLabelStyle(DubplateColor.playerSecondaryText)
 
-                Text(player.currentItem?.title ?? "Nothing playing")
-                    .font(.system(size: 34, weight: .semibold))
-                    .kerning(-0.9)
+                Text(player.currentItem?.title ?? "")
+                    .dubplateDisplayStyle(.screen)
                     .foregroundStyle(DubplateColor.playerPrimaryText)
-                    .lineLimit(3)
-                    .minimumScaleFactor(0.7)
 
                 Text(player.currentItem?.artistName ?? "")
                     .font(.system(size: 15))
                     .foregroundStyle(DubplateColor.playerSecondaryText)
-
-                if let format = player.currentItem?.format, format.isKnown {
-                    Text(format.summary)
-                        .font(DubplateType.metadata)
-                        .foregroundStyle(DubplateColor.playerSecondaryText.opacity(0.7))
-                }
             }
+
+            runningOrder
 
             ScrubBar(
                 progress: player.progress,
@@ -91,16 +88,65 @@ public struct GalleryModeView: View {
                 onScrubEnd: { player.endScrub() }
             )
 
-            HStack(spacing: DubplateLayout.xl) {
+            HStack(spacing: DubplateLayout.m) {
                 TransportControls(player: player, size: .regular, showsModes: false)
                 Spacer()
                 if let onShowVersions {
-                    Button("Versions", action: onShowVersions)
+                    Button("Mixes", action: onShowVersions)
                         .buttonStyle(.plain)
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(DubplateColor.playerSecondaryText)
                 }
             }
+
+            credits
         }
+    }
+
+    /// The sequence, with where you are in it. This is what Stream cannot have and
+    /// what makes Gallery a different way of hearing the same record.
+    private var runningOrder: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(player.queue.items) { item in
+                let isCurrent = item.id == player.currentItem?.id
+                Button {
+                    player.skip(to: item)
+                } label: {
+                    HStack(spacing: DubplateLayout.m) {
+                        Text("\(item.trackNumber)")
+                            .font(DubplateType.metadata)
+                            .foregroundStyle(DubplateColor.playerSecondaryText)
+                            .frame(width: 18, alignment: .trailing)
+                        Text(item.title)
+                            .font(.system(size: 15, weight: isCurrent ? .medium : .regular))
+                            .foregroundStyle(
+                                isCurrent ? DubplateColor.playerPrimaryText : DubplateColor.playerSecondaryText
+                            )
+                            .lineLimit(1)
+                        Spacer(minLength: DubplateLayout.s)
+                        Text(Formatting.duration(item.duration))
+                            .font(DubplateType.metadata)
+                            .foregroundStyle(DubplateColor.playerSecondaryText)
+                    }
+                    .frame(height: 26)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    /// What is printed on the back of a sleeve.
+    private var credits: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            if let format = player.currentItem?.format, format.isKnown {
+                Text(format.summary)
+            }
+            if let release = player.currentItem?.releaseTitle, !release.isEmpty {
+                Text("\(release) · \(player.currentItem?.artistName ?? "")")
+            }
+        }
+        .font(DubplateType.metadata)
+        .foregroundStyle(DubplateColor.playerSecondaryText)
     }
 }

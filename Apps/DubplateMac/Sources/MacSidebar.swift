@@ -20,13 +20,15 @@ struct MacSidebar: View {
 
     var body: some View {
         List(selection: selectionBinding) {
+            // Text rows: a square for EPs and a circle for Singles meant nothing,
+            // and six icons beside six words is chrome outnumbering content.
             Section("Library") {
-                row(.recentlyPlayed, systemImage: "clock")
-                row(.albums, systemImage: "square.stack")
-                row(.eps, systemImage: "square")
-                row(.singles, systemImage: "circle")
-                row(.projects, systemImage: "tray.full")
-                row(.inbox, systemImage: "tray")
+                row(.recentlyPlayed)
+                row(.albums)
+                row(.eps)
+                row(.singles)
+                row(.projects)
+                row(.inbox)
             }
 
             if !releases.isEmpty {
@@ -71,7 +73,7 @@ struct MacSidebar: View {
             }
             Button("Cancel", role: .cancel) { releaseToDelete = nil }
         } message: {
-            Text("Every mix of every track leaves this Mac and your iCloud. This can’t be undone.")
+            Text("Deleted from this Mac and from iCloud. This can’t be undone.")
         }
     }
 
@@ -88,9 +90,10 @@ struct MacSidebar: View {
         )
     }
 
-    private func row(_ target: LibrarySection, systemImage: String) -> some View {
-        Label(target.title, systemImage: systemImage)
+    private func row(_ target: LibrarySection) -> some View {
+        Text(target.title)
             .font(.system(size: 13))
+            .frame(height: 22)
             .tag(target)
     }
 

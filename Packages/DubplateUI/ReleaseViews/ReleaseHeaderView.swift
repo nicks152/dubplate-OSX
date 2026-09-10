@@ -20,6 +20,9 @@ public struct ReleaseHeaderView: View {
     private let artworkEdge: CGFloat
     /// Editing belongs to the Mac. The phone shows a record; it does not rename one.
     private let isEditable: Bool
+    /// Puts the cursor in the title, for a record that has just been named after a
+    /// folder and deserves a real name.
+    private let focusesTitleOnAppear: Bool
     private let onPlay: () -> Void
     private let onShuffle: () -> Void
     private let onEditArtwork: (() -> Void)?
@@ -37,6 +40,7 @@ public struct ReleaseHeaderView: View {
         layout: Layout = .horizontal,
         artworkEdge: CGFloat = 220,
         isEditable: Bool = false,
+        focusesTitleOnAppear: Bool = false,
         onPlay: @escaping () -> Void,
         onShuffle: @escaping () -> Void,
         onEditArtwork: (() -> Void)? = nil,
@@ -46,6 +50,7 @@ public struct ReleaseHeaderView: View {
         self.layout = layout
         self.artworkEdge = artworkEdge
         self.isEditable = isEditable
+        self.focusesTitleOnAppear = focusesTitleOnAppear
         self.onPlay = onPlay
         self.onShuffle = onShuffle
         self.onEditArtwork = onEditArtwork
@@ -55,17 +60,25 @@ public struct ReleaseHeaderView: View {
     public var body: some View {
         switch layout {
         case .horizontal:
-            HStack(alignment: .bottom, spacing: DubplateLayout.xl) {
-                artwork
-                VStack(alignment: .leading, spacing: DubplateLayout.m) {
-                    text(alignment: .leading)
-                    buttons
+            GeometryReader { geometry in
+                // The cover scales with the pane: 220pt of a 1180pt window is 19%,
+                // on the screen that exists to make covers matter.
+                let edge = min(360, max(240, geometry.size.width * 0.28))
+                HStack(alignment: .top, spacing: DubplateLayout.xl) {
+                    artwork(edge: edge)
+                    VStack(alignment: .leading, spacing: DubplateLayout.m) {
+                        text(alignment: .leading)
+                        Spacer(minLength: 0)
+                        buttons
+                    }
+                    .frame(height: edge)
+                    Spacer(minLength: 0)
                 }
-                Spacer(minLength: 0)
             }
+            .frame(height: headerHeight)
         case .centred:
             VStack(spacing: DubplateLayout.l) {
-                artwork
+                artwork(edge: artworkEdge)
                 text(alignment: .center)
                 buttons
             }
@@ -73,13 +86,16 @@ public struct ReleaseHeaderView: View {
         }
     }
 
-    private var artwork: some View {
+    /// Tall enough for the largest cover the pane will produce.
+    private var headerHeight: CGFloat { 360 }
+
+    private func artwork(edge: CGFloat) -> some View {
         ArtworkView(
             asset: release.artwork,
             title: release.title,
-            cornerRadius: DubplateLayout.largeArtworkRadius
+            artist: release.artistName
         )
-        .frame(width: artworkEdge, height: artworkEdge)
+        .frame(width: edge, height: edge)
         .shadow(color: .black.opacity(0.3), radius: 26, y: 12)
         .contentShape(Rectangle())
         .onTapGesture { onEditArtwork?() }
@@ -97,7 +113,7 @@ public struct ReleaseHeaderView: View {
                 // is editable exactly where you read it — no dialog, no inspector.
                 TextField("Untitled", text: $release.title)
                     .textFieldStyle(.plain)
-                    .dubplateDisplayStyle(size: layout == .centred ? 30 : 44)
+                    .dubplateDisplayStyle(layout == .centred ? .screen : .page)
                     .foregroundStyle(DubplateColor.primaryText)
                     .focused($focusedField, equals: .title)
                     .onSubmit { commit() }
@@ -110,7 +126,7 @@ public struct ReleaseHeaderView: View {
                     .onSubmit { commit() }
             } else {
                 Text(release.title.isEmpty ? "Untitled" : release.title)
-                    .dubplateDisplayStyle(size: layout == .centred ? 30 : 44)
+                    .dubplateDisplayStyle(layout == .centred ? .screen : .page)
                     .foregroundStyle(DubplateColor.primaryText)
                     .frame(maxWidth: .infinity, alignment: alignment == .center ? .center : .leading)
 
@@ -126,6 +142,10 @@ public struct ReleaseHeaderView: View {
         .multilineTextAlignment(alignment == .center ? .center : .leading)
         .onChange(of: focusedField) { _, newValue in
             if newValue == nil { commit() }
+        }
+        .onAppear {
+            guard focusesTitleOnAppear, isEditable else { return }
+            focusedField = .title
         }
     }
 

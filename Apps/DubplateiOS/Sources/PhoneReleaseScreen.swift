@@ -35,7 +35,7 @@ struct PhoneReleaseScreen: View {
                 footer
             }
             .padding(.horizontal, DubplateLayout.l)
-            .padding(.bottom, 120)
+            .padding(.bottom, DubplateLayout.xl)
         }
         .background(DubplateColor.ground)
         // No navigation title: the release name is the first thing in the content,
@@ -136,13 +136,21 @@ struct DownloadButton: View {
     var body: some View {
         let state = downloadState
         VStack(alignment: .leading, spacing: DubplateLayout.xs) {
-            Button {
-                Task { await toggle(state) }
-            } label: {
-                Label(state.title, systemImage: state.symbol)
+            if state == .onlyCopyHere {
+                // A condition, not an action. A disabled button whose label is a
+                // status is a control that lies about being one.
+                Text(state.title)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(DubplateColor.secondaryText)
+            } else {
+                Button {
+                    Task { await toggle(state) }
+                } label: {
+                    Label(state.title, systemImage: state.symbol)
+                }
+                .buttonStyle(DubplateQuietButtonStyle())
+                .disabled(isWorking)
             }
-            .buttonStyle(DubplateQuietButtonStyle())
-            .disabled(isWorking || state == .onlyCopyHere)
 
             Text(state.detail(size: totalSize))
                 .font(DubplateType.metadata)
@@ -163,7 +171,7 @@ struct DownloadButton: View {
             case .downloaded: return "Remove Download"
             case .notDownloaded: return "Download Release"
             case .partial: return "Finish Downloading"
-            case .onlyCopyHere: return "Only Copy Is Here"
+            case .onlyCopyHere: return "This is the only copy"
             }
         }
 

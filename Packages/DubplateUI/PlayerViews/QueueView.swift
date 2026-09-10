@@ -16,7 +16,7 @@ public struct QueueView: View {
         VStack(alignment: .leading, spacing: DubplateLayout.l) {
             HStack {
                 Text("Up Next")
-                    .dubplateDisplayStyle(size: 20)
+                    .dubplateDisplayStyle(.inline)
                     .foregroundStyle(DubplateColor.playerPrimaryText)
                 Spacer()
                 if let onDismiss {
@@ -118,7 +118,7 @@ public struct VersionPickerSheet: View {
         VStack(alignment: .leading, spacing: DubplateLayout.l) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Versions").dubplateLabelStyle(DubplateColor.playerSecondaryText)
+                    Text("Mixes").dubplateLabelStyle(DubplateColor.playerSecondaryText)
                     Text(track.displayTitle)
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(DubplateColor.playerPrimaryText)
@@ -161,12 +161,12 @@ public struct VersionPickerSheet: View {
                     .accessibilityHint("Plays this mix from the same moment")
 
                     if version.isCurrent {
-                        Text("Current")
+                        Text("In the record")
                             .font(DubplateType.label)
                             .kerning(0.5)
                             .foregroundStyle(DubplateColor.playerSecondaryText)
                     } else {
-                        Button("Set as Current") { onSetCurrent(version) }
+                        Button("Use This Mix") { onSetCurrent(version) }
                             .buttonStyle(.plain)
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(DubplateColor.playerSecondaryText)

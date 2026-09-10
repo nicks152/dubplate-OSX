@@ -8,6 +8,8 @@ import DubplateCore
 public struct ReleaseCard: View {
     private let release: Release
     private let isPlaying: Bool
+    /// A paused record must stop dancing in the grid.
+    private let isAnimatingIndicator: Bool
     private let onPlay: (() -> Void)?
     /// On a phone there is no hover, so the affordance has to be there.
     #if os(iOS)
@@ -19,17 +21,28 @@ public struct ReleaseCard: View {
     @State private var isHovering = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    public init(release: Release, isPlaying: Bool = false, onPlay: (() -> Void)? = nil) {
+    public init(
+        release: Release,
+        isPlaying: Bool = false,
+        isAnimatingIndicator: Bool = false,
+        onPlay: (() -> Void)? = nil
+    ) {
         self.release = release
         self.isPlaying = isPlaying
+        self.isAnimatingIndicator = isAnimatingIndicator
         self.onPlay = onPlay
     }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: DubplateLayout.m) {
             ZStack(alignment: .bottomTrailing) {
-                ArtworkView(asset: release.artwork, title: release.title)
-                    .shadow(color: .black.opacity(isHovering ? 0.28 : 0.16), radius: isHovering ? 18 : 10, y: isHovering ? 8 : 4)
+                ArtworkView(asset: release.artwork, title: release.title, artist: release.artistName)
+                    .overlay {
+                        // A shadow at 0.16 black is invisible on a near-black ground;
+                        // on a dark shelf, hover is a light edge.
+                        RoundedRectangle(cornerRadius: DubplateLayout.artworkRadius, style: .continuous)
+                            .strokeBorder(.white.opacity(isHovering ? 0.32 : 0), lineWidth: 1)
+                    }
 
                 if let onPlay, isHovering || alwaysShowsPlay {
                     Button(action: onPlay) {
@@ -48,10 +61,12 @@ public struct ReleaseCard: View {
                 }
             }
 
+            // Two lines. A third — "Album · 8 tracks" — is what turns a wall of
+            // covers into a directory listing, and the release page already says it.
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: DubplateLayout.xs) {
                     if isPlaying {
-                        PlayingIndicator()
+                        PlayingIndicator(isAnimating: isAnimatingIndicator)
                     }
                     Text(release.title.isEmpty ? "Untitled" : release.title)
                         .font(DubplateType.cardTitle)
@@ -63,14 +78,9 @@ public struct ReleaseCard: View {
                     .font(DubplateType.rowSubtitle)
                     .foregroundStyle(DubplateColor.secondaryText)
                     .lineLimit(1)
-                Text(release.subtitleLine)
-                    .font(DubplateType.metadata)
-                    .foregroundStyle(DubplateColor.tertiaryText)
-                    .lineLimit(1)
             }
         }
         .contentShape(Rectangle())
-        .scaleEffect(isHovering && !reduceMotion ? 1.012 : 1)
         .animation(DubplateMotion.respecting(reduceMotion, DubplateMotion.quick), value: isHovering)
         .onHover { isHovering = $0 }
         .accessibilityElement(children: .combine)

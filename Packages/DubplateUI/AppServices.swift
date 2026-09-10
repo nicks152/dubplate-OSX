@@ -206,6 +206,12 @@ public final class AppServices {
         lastImportSummary = summary
     }
 
+    /// One line, said once. Used for the small confirmations that should not be
+    /// dialogs.
+    public func announce(_ message: String) {
+        lastImportSummary = message
+    }
+
     public func clearImportSummary() {
         lastImportSummary = nil
     }

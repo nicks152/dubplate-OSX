@@ -10,6 +10,7 @@ public struct TrackInspectorView: View {
     @Bindable private var track: Track
     private let onCommit: () -> Void
     private let onShowVersions: () -> Void
+    @FocusState private var focusedField: String?
 
     public init(track: Track, onCommit: @escaping () -> Void, onShowVersions: @escaping () -> Void) {
         self.track = track
@@ -39,6 +40,9 @@ public struct TrackInspectorView: View {
             .padding(DubplateLayout.xl)
         }
         .background(DubplateColor.raised)
+        .onChange(of: focusedField) { _, newValue in
+            if newValue == nil { onCommit() }
+        }
     }
 
     private var identity: some View {
@@ -123,24 +127,34 @@ public struct TrackInspectorView: View {
         }
     }
 
+    /// No fill and no border at rest — a hairline that lights up on focus.
+    ///
+    /// A persistent filled box under every value is what makes an inspector read as
+    /// a database record editor, which is the one thing this pane must not be.
     private func field(
         _ label: String,
         text: Binding<String>,
         placeholder: String = "",
         axis: Axis = .horizontal
     ) -> some View {
-        VStack(alignment: .leading, spacing: DubplateLayout.xs) {
+        VStack(alignment: .leading, spacing: 3) {
             Text(label).dubplateLabelStyle()
             TextField(placeholder, text: text, axis: axis)
                 .textFieldStyle(.plain)
-                .font(DubplateType.rowTitle)
+                .font(.system(size: 15))
                 .foregroundStyle(DubplateColor.primaryText)
                 .lineLimit(axis == .vertical ? 2...6 : 1)
-                .padding(.vertical, DubplateLayout.s)
-                .padding(.horizontal, DubplateLayout.m)
-                .background(DubplateColor.sunken, in: RoundedRectangle(cornerRadius: DubplateLayout.controlRadius, style: .continuous))
+                .focused($focusedField, equals: label)
                 .onSubmit(onCommit)
+                .padding(.bottom, 5)
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(focusedField == label ? DubplateColor.primaryText : DubplateColor.hairline)
+                        .frame(height: DubplateLayout.hairline)
+                }
         }
+        .frame(minHeight: 44, alignment: .top)
+        .animation(DubplateMotion.quick, value: focusedField)
     }
 
 }

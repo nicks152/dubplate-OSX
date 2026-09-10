@@ -28,7 +28,12 @@ public enum DubplateColor {
     /// Artist names, durations, everything secondary.
     public static let secondaryText = adaptive(light: 0x121212, dark: 0xF4F3F1, lightAlpha: 0.58, darkAlpha: 0.60)
     /// Metadata labels, format strings, timestamps.
-    public static let tertiaryText = adaptive(light: 0x121212, dark: 0xF4F3F1, lightAlpha: 0.36, darkAlpha: 0.38)
+    ///
+    /// 0.50 rather than 0.38: this is the colour of every duration, format string,
+    /// date and filename in the product, at 12pt, and 0.38 over the ground blends to
+    /// roughly 3.3:1 — below AA for text at that size. Nothing nests further opacity
+    /// on top of it.
+    public static let tertiaryText = adaptive(light: 0x121212, dark: 0xF4F3F1, lightAlpha: 0.48, darkAlpha: 0.50)
 
     /// The one accent, used for the playing indicator and the active version.
     /// A warm bone rather than a brand blue.

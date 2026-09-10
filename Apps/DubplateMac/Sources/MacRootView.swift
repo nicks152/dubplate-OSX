@@ -39,9 +39,8 @@ struct MacRootView: View {
 
     @State private var section: LibrarySection = .albums
     @State private var isShowingNewRelease = false
-    @State private var isShowingPreview = false
-    @State private var previewMode: PreviewMode = .stream
     @State private var searchText = ""
+    @Environment(\.openWindow) private var openWindow
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
     var body: some View {
@@ -58,7 +57,7 @@ struct MacRootView: View {
                 player: player,
                 artwork: currentArtwork,
                 style: .bar,
-                onOpen: { isShowingPreview = true }
+                onOpen: { openWindow(id: DubplateWindow.phonePreview) }
             )
         }
         .overlay(alignment: .bottom) {
@@ -91,26 +90,19 @@ struct MacRootView: View {
                 }
             )
         }
-        .sheet(isPresented: $isShowingPreview) {
-            DevicePreviewView(
-                player: player,
-                artwork: currentArtwork,
-                canvas: currentCanvas,
-                mode: $previewMode
-            )
-            .frame(minWidth: 520, minHeight: 900)
-        }
-        .searchable(text: $searchText, placement: .sidebar, prompt: "Search releases and tracks")
+        .searchable(text: $searchText, placement: .sidebar, prompt: "Search records, tracks and mixes")
         .onReceive(NotificationCenter.default.publisher(for: .dubplateNewRelease)) { _ in
             isShowingNewRelease = true
         }
         .onReceive(NotificationCenter.default.publisher(for: .dubplateTogglePreview)) { _ in
-            isShowingPreview.toggle()
-        }
-        .onAppear {
-            previewMode = services.settings.defaultPreviewMode
+            openWindow(id: DubplateWindow.phonePreview)
         }
     }
+
+    /// Set when a record has just been created from a folder drop, so the release
+    /// page can put the cursor in the title — naming it is the first thing that
+    /// turns the folder into a record, and the fast path never asked.
+    @State private var releaseAwaitingTitle: UUID?
 
     @ViewBuilder
     private var detail: some View {
@@ -123,18 +115,24 @@ struct MacRootView: View {
             switch section {
             case .release(let id):
                 if let release = library.release(id: id) {
-                    ReleaseDetailScreen(release: release)
-                        .id(release.id)
-                        .focusedValue(\.selectedRelease, release.id)
+                    ReleaseDetailScreen(
+                        release: release,
+                        focusesTitleOnAppear: releaseAwaitingTitle == release.id
+                    )
+                    .id(release.id)
+                    .focusedValue(\.selectedRelease, release.id)
+                    .onAppear { releaseAwaitingTitle = nil }
                 } else {
                     EmptyState(headline: "That release is gone", message: "It may have been deleted on another device.")
                 }
             case .inbox:
                 InboxScreen()
             default:
-                MacLibraryScreen(section: section) { release in
-                    section = .release(release.id)
-                }
+                MacLibraryScreen(
+                    section: section,
+                    onOpen: { release in section = .release(release.id) },
+                    onCreatedFromDrop: { releaseAwaitingTitle = $0.id }
+                )
             }
         }
     }
@@ -146,11 +144,11 @@ struct MacRootView: View {
         }
         ToolbarItem(placement: .primaryAction) {
             Button {
-                isShowingPreview = true
+                openWindow(id: DubplateWindow.phonePreview)
             } label: {
-                Label("Phone Preview", systemImage: "iphone")
+                Label("iPhone", systemImage: "iphone")
             }
-            .help("See this release the way it will look on a phone")
+            .help("See this record the way it will look on a phone")
         }
     }
 
@@ -161,16 +159,6 @@ struct MacRootView: View {
     private var currentArtwork: ArtworkAsset? {
         guard let releaseID = player.currentItem?.releaseID else { return nil }
         return library.release(id: releaseID)?.artwork
-    }
-
-    private var currentCanvas: MotionSource? {
-        guard let trackID = player.currentItem?.trackID,
-              let track = library.track(id: trackID)
-        else {
-            return nil
-        }
-        if let canvas = track.canvas { return services.motionSource(for: canvas) }
-        return track.release?.animatedArtwork.flatMap { services.motionSource(for: $0) }
     }
 
     private func create(_ result: NewReleaseSheet.Result) async {

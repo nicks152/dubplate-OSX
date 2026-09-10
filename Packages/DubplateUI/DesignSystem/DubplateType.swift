@@ -8,13 +8,18 @@ import SwiftUI
 /// handful of steps so the hierarchy stays obvious.
 public enum DubplateType {
 
-    /// A release title on its own page. Big, tight, confident.
-    public static func display(_ size: CGFloat = 44) -> Font {
-        .system(size: size, weight: .semibold, design: .default)
+    /// The four display steps. A record's title is one of these and nothing else,
+    /// so the same record reads the same way on both platforms.
+    public enum Display: CGFloat {
+        case page = 44
+        case screen = 30
+        case sheet = 22
+        case inline = 17
     }
 
-    /// Section titles: "Recently Played", "Your Music".
-    public static let sectionTitle = Font.system(size: 13, weight: .semibold)
+    public static func display(_ step: Display = .page) -> Font {
+        .system(size: step.rawValue, weight: .semibold)
+    }
 
     /// Release names in the grid.
     public static let cardTitle = Font.system(size: 14, weight: .medium)
@@ -46,12 +51,15 @@ public extension View {
             .foregroundStyle(color)
     }
 
-    /// Display titles are tracked in slightly at large sizes, the way set type is.
-    func dubplateDisplayStyle(size: CGFloat = 44) -> some View {
+    /// Display titles are tracked in, the way set type is — proportionally, so the
+    /// character survives the step down instead of loosening at small sizes.
+    ///
+    /// No `minimumScaleFactor`: silently shrinking a 44pt title to 30.8pt is a
+    /// settings-screen reflex. Two lines are designed for; three is a wrap.
+    func dubplateDisplayStyle(_ step: DubplateType.Display = .page) -> some View {
         self
-            .font(DubplateType.display(size))
-            .kerning(size >= 34 ? -0.8 : -0.3)
-            .lineLimit(3)
-            .minimumScaleFactor(0.7)
+            .font(DubplateType.display(step))
+            .kerning(step.rawValue * -0.022)
+            .lineLimit(2)
     }
 }

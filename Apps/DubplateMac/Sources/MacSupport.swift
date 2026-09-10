@@ -89,7 +89,7 @@ struct InboxScreen: View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: DubplateLayout.xs) {
                 Text("Inbox")
-                    .dubplateDisplayStyle(size: 30)
+                    .dubplateDisplayStyle(.screen)
                     .foregroundStyle(DubplateColor.primaryText)
                 Text("Ideas and loose bounces that aren’t on a record yet.")
                     .font(DubplateType.metadata)

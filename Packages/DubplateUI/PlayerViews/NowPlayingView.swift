@@ -13,6 +13,8 @@ public struct NowPlayingView: View {
     private let canvas: MotionSource?
     @Binding private var mode: PreviewMode
     private let showsModePicker: Bool
+    @State private var showsSwitchHint = false
+    @State private var hintTask: Task<Void, Never>?
     private let onShowVersions: (() -> Void)?
     private let onShowQueue: (() -> Void)?
     private let onDismiss: (() -> Void)?
@@ -59,9 +61,38 @@ public struct NowPlayingView: View {
                     PreviewModePicker(mode: $mode)
                         .padding(.bottom, DubplateLayout.l)
                 }
+            } else if showsSwitchHint {
+                // On the phone the mode is a swipe, and the only sign of it is three
+                // dots for a moment after it changes. A permanent segmented pill
+                // under the artwork tells the listener they are in a preview harness.
+                VStack {
+                    Spacer()
+                    HStack(spacing: 6) {
+                        ForEach(PreviewMode.allCases) { option in
+                            Circle()
+                                .fill(.white.opacity(option == mode ? 0.7 : 0.25))
+                                .frame(width: 4, height: 4)
+                        }
+                    }
+                    .padding(.bottom, DubplateLayout.l)
+                    .transition(.opacity)
+                }
+                .allowsHitTesting(false)
             }
         }
         .animation(DubplateMotion.expressive, value: mode)
+        .animation(DubplateMotion.quick, value: showsSwitchHint)
+        .onChange(of: mode) { _, _ in
+            guard !showsModePicker else { return }
+            showsSwitchHint = true
+            hintTask?.cancel()
+            hintTask = Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(1_200))
+                guard !Task.isCancelled else { return }
+                showsSwitchHint = false
+            }
+        }
+        .onDisappear { hintTask?.cancel() }
         .overlay(alignment: .topLeading) {
             if let onDismiss {
                 Button {

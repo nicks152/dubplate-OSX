@@ -14,8 +14,8 @@ public struct DevicePreviewView: View {
     private let canvas: MotionSource?
     @Binding private var mode: PreviewMode
 
-    /// iPhone 15/16 logical size. Fixed on purpose: previewing at an arbitrary size
-    /// would defeat the point.
+    /// iPhone logical size. Fixed on purpose: previewing at an arbitrary size would
+    /// defeat the point.
     private static let phoneSize = CGSize(width: 393, height: 852)
 
     public init(
@@ -33,6 +33,7 @@ public struct DevicePreviewView: View {
     public var body: some View {
         VStack(spacing: DubplateLayout.l) {
             PreviewModePicker(mode: $mode)
+                .help(mode.explanation)
 
             GeometryReader { geometry in
                 let scale = min(
@@ -59,11 +60,6 @@ public struct DevicePreviewView: View {
                 .scaleEffect(scale)
                 .frame(width: geometry.size.width, height: geometry.size.height)
             }
-
-            Text(mode.explanation)
-                .font(DubplateType.metadata)
-                .foregroundStyle(DubplateColor.tertiaryText)
-                .multilineTextAlignment(.center)
         }
         .padding(DubplateLayout.xl)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

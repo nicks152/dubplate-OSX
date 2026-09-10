@@ -20,6 +20,7 @@ struct PhonePlayerScreen: View {
             artwork: currentArtwork,
             canvas: currentCanvas,
             mode: $mode,
+            showsModePicker: false,
             onShowVersions: { isShowingVersions = true },
             onShowQueue: { isShowingQueue = true },
             onDismiss: onDismiss

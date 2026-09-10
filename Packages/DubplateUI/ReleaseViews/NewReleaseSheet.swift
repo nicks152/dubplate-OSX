@@ -43,7 +43,7 @@ public struct NewReleaseSheet: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: DubplateLayout.xl) {
             Text("New Release")
-                .dubplateDisplayStyle(size: 26)
+                .dubplateDisplayStyle(.screen)
                 .foregroundStyle(DubplateColor.primaryText)
 
             typePicker

@@ -7,6 +7,9 @@ import DubplateUI
 struct MacLibraryScreen: View {
     let section: LibrarySection
     let onOpen: (Release) -> Void
+    /// Called when a record was created from a drop, so the window can put the
+    /// cursor in its title.
+    var onCreatedFromDrop: ((Release) -> Void)?
 
     @Environment(AppServices.self) private var services
     @Environment(LibraryStore.self) private var library
@@ -32,6 +35,7 @@ struct MacLibraryScreen: View {
                     LibraryGrid(
                         releases: releases,
                         playingReleaseID: player.currentItem?.releaseID,
+                        isPlaying: player.isPlaying,
                         onOpen: onOpen,
                         onPlay: { services.play(release: $0) }
                     )
@@ -53,21 +57,12 @@ struct MacLibraryScreen: View {
         } isTargeted: { isTargeted = $0 }
     }
 
+    /// No count line: "6 releases" is a row count from a database view, and the
+    /// grid underneath already says how many there are.
     private var header: some View {
-        VStack(alignment: .leading, spacing: DubplateLayout.xs) {
-            Text(section.title)
-                .dubplateDisplayStyle(size: 30)
-                .foregroundStyle(DubplateColor.primaryText)
-            Text(subtitle)
-                .font(DubplateType.metadata)
-                .foregroundStyle(DubplateColor.tertiaryText)
-        }
-    }
-
-    private var subtitle: String {
-        let count = releases.count
-        guard count > 0 else { return "Nothing here yet" }
-        return "\(count) release\(count == 1 ? "" : "s")"
+        Text(section.title)
+            .dubplateDisplayStyle(.screen)
+            .foregroundStyle(DubplateColor.primaryText)
     }
 
     private var emptyHeadline: String {
@@ -100,8 +95,10 @@ struct MacLibraryScreen: View {
             type: ReleaseType.inferred(fromTrackCount: urls.count)
         )
         let plan = library.plan(for: urls, in: release)
-        await library.apply(plan, to: release)
+        let outcome = await library.apply(plan, to: release)
+        services.report(outcome)
         await services.registerNewMedia(in: release)
+        onCreatedFromDrop?(release)
         onOpen(release)
     }
 }
