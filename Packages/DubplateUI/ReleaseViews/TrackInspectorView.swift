@@ -162,7 +162,10 @@ public struct TrackInspectorView: View {
                 .textFieldStyle(.plain)
                 .dubplateFont(.fixed(15))
                 .foregroundStyle(DubplateColor.primaryText)
-                .lineLimit(axis == .vertical ? 2...6 : 1)
+                // Both arms are ranges. `lineLimit` has an Int overload and a
+                // ClosedRange one, and a ternary that returns one of each has no
+                // single type for the compiler to pick.
+                .lineLimit(axis == .vertical ? 2...6 : 1...1)
                 .focused($focusedField, equals: label)
                 .onSubmit(onCommit)
                 .padding(.bottom, 5)

@@ -131,7 +131,7 @@ public final class AppServices {
     /// Asks for the file playback is holding on, again.
     public func retryPendingDownload() {
         guard let waiting = player.awaitingDownloadOf else { return }
-        Task { await fetchAndResume(waiting) }
+        Task { await self.fetchAndResume(waiting) }
     }
 
     /// What "Try Again" does for a given failure, or nil when there is nothing the
@@ -372,14 +372,14 @@ public final class AppServices {
         let removed = library.delete(release: release)
         artwork.invalidateAll()
         guard !removed.isEmpty else { return }
-        Task { await sync.forget(assetIDs: removed) }
+        Task { await self.sync.forget(assetIDs: removed) }
     }
 
     /// Deletes one track and everything under it, clearing iCloud too.
     public func delete(track: Track) {
         let removed = library.delete(track: track)
         guard !removed.isEmpty else { return }
-        Task { await sync.forget(assetIDs: removed) }
+        Task { await self.sync.forget(assetIDs: removed) }
     }
 
     /// A looping visual, with its trim, if the file is actually on this device.

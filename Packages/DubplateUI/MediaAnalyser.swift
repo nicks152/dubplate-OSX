@@ -45,12 +45,17 @@ public final class MediaAnalyser {
     private var skipped: Set<UUID> = []
 
     private func run(limit: Int) async {
-        let wantsLoudness = settings.measuresLoudness
-        var descriptor = FetchDescriptor<AudioAsset>(
-            predicate: wantsLoudness
-                ? #Predicate { $0.waveformPeaks == nil || $0.integratedLoudness == nil }
-                : #Predicate { $0.waveformPeaks == nil }
-        )
+        // One `#Predicate` per statement, each with the type written out. A
+        // ternary between two of them expands to two large macro bodies inside one
+        // expression, and the type-checker gives up rather than solving it — which
+        // then cascades into every line that touches the descriptor.
+        let predicate: Predicate<AudioAsset>
+        if settings.measuresLoudness {
+            predicate = #Predicate { $0.waveformPeaks == nil || $0.integratedLoudness == nil }
+        } else {
+            predicate = #Predicate { $0.waveformPeaks == nil }
+        }
+        var descriptor = FetchDescriptor<AudioAsset>(predicate: predicate)
         // Without a limit this hydrates every unanalysed asset in the library on the
         // main actor to take the first forty.
         descriptor.fetchLimit = limit + skipped.count

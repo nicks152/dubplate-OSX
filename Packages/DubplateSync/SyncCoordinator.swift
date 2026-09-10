@@ -132,8 +132,8 @@ public final class SyncCoordinator {
         availabilityFlush?.cancel()
         availabilityFlush = nil
         Task {
-            await engine.stop()
-            await index.flush()
+            await self.engine.stop()
+            await self.index.flush()
         }
     }
 
@@ -149,7 +149,7 @@ public final class SyncCoordinator {
     public func setEnabled(_ enabled: Bool) {
         isEnabled = enabled
         if enabled {
-            Task { await start() }
+            Task { await self.start() }
         } else {
             stop()
             status = .offline

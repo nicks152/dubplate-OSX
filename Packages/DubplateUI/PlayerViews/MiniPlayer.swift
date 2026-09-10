@@ -29,45 +29,74 @@ public struct MiniPlayer: View {
         self.onOpen = onOpen
     }
 
+    /// Split into three deliberately. As one chain — fourteen modifiers with two
+    /// conditional overlay closures inside it — the type-checker gave up rather
+    /// than solving the expression. SwiftUI bodies get expensive faster than they
+    /// look, and a `some View` boundary is where the solver gets to rest.
     public var body: some View {
         if let item = player.currentItem {
-            content(item)
-                .background(background)
-                .overlay(alignment: .top) {
-                    if style == .bar {
-                        // The Mac has no other scrubber outside the phone preview,
-                        // and a producer listening back to a mix needs to get to
-                        // 2:14 without opening anything.
-                        SlimScrubber(player: player)
-                    }
-                }
-                .overlay(alignment: .bottom) {
-                    if style == .floating {
-                        GeometryReader { geometry in
-                            Rectangle()
-                                .fill(DubplateColor.playerPrimaryText.opacity(0.55))
-                                .frame(width: geometry.size.width * player.progress, height: 2)
-                        }
-                        .frame(height: 2)
-                    }
-                }
-                .clipShape(RoundedRectangle(cornerRadius: style == .floating ? 12 : 0, style: .continuous))
-                .contentShape(Rectangle())
-                .onTapGesture(perform: onOpen)
-                .accessibilityElement(children: .contain)
-                .accessibilityLabel("Now playing: \(item.title) by \(item.artistName)")
-                .accessibilityHint("Opens the player")
-                // The hint promised a way in and there was none: a tap gesture is
-                // not a button, so VoiceOver had nothing to activate.
-                .accessibilityAddTraits(.isButton)
-                .accessibilityAction(action: onOpen)
+            interactive(shell(for: item), describing: item)
         }
+    }
+
+    private func shell(for item: PlaybackQueueItem) -> some View {
+        content(item)
+            .background(background)
+            .overlay(alignment: .top) { scrubber }
+            .overlay(alignment: .bottom) { progressLine }
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+    }
+
+    private func interactive(_ view: some View, describing item: PlaybackQueueItem) -> some View {
+        view
+            .contentShape(Rectangle())
+            .onTapGesture(perform: onOpen)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Now playing: \(item.title) by \(item.artistName)")
+            .accessibilityHint("Opens the player")
+            // The hint promised a way in and there was none: a tap gesture is not a
+            // button, so VoiceOver had nothing to activate.
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction(action: onOpen)
+    }
+
+    /// The Mac has no other scrubber outside the phone preview, and a producer
+    /// listening back to a mix needs to get to 2:14 without opening anything.
+    @ViewBuilder
+    private var scrubber: some View {
+        if style == .bar {
+            SlimScrubber(player: player)
+        }
+    }
+
+    @ViewBuilder
+    private var progressLine: some View {
+        if style == .floating {
+            GeometryReader { geometry in
+                Rectangle()
+                    .fill(DubplateColor.playerPrimaryText.opacity(0.55))
+                    .frame(width: geometry.size.width * player.progress, height: 2)
+            }
+            .frame(height: 2)
+        }
+    }
+
+    private var cornerRadius: CGFloat {
+        style == .floating ? 12 : 0
+    }
+
+    private var artworkEdge: CGFloat {
+        style == .bar ? 30 : 40
+    }
+
+    private var barHeight: CGFloat {
+        style == .bar ? 52 : 62
     }
 
     private func content(_ item: PlaybackQueueItem) -> some View {
         HStack(spacing: DubplateLayout.m) {
             ArtworkView(asset: artwork, title: item.releaseTitle, cornerRadius: 4)
-                .frame(width: style == .bar ? 30 : 40, height: style == .bar ? 30 : 40)
+                .frame(width: artworkEdge, height: artworkEdge)
 
             VStack(alignment: .leading, spacing: 0) {
                 Text(item.title)
@@ -96,7 +125,7 @@ public struct MiniPlayer: View {
             )
         }
         .padding(.horizontal, DubplateLayout.m)
-        .frame(height: style == .bar ? 52 : 62)
+        .frame(height: barHeight)
     }
 
     @ViewBuilder

@@ -552,7 +552,14 @@ def check_own_members(module: Module, sources: dict[str, str], allow: set[str],
                     f"'{name}' calls '{called}()', which it does not declare"))
 
 
-SELF_CAPTURE_RE = re.compile(r"\{\s*\[\s*(?:weak\s+|unowned\s+)?self\s*\]")
+# Two shapes need `self.` spelled out inside a class or actor: a closure with an
+# explicit capture list, and an escaping closure with none at all — `Task { … }`
+# being overwhelmingly the common case. The second is the one that is easy to miss,
+# because nothing in the syntax announces that self is being captured.
+SELF_CAPTURE_RE = re.compile(
+    r"\{\s*\[\s*(?:weak\s+|unowned\s+)?self\s*\]"
+    r"|\bTask\s*(?:\.detached\s*\([^)]*\))?\s*\{"
+)
 LOCAL_BINDING_RE = re.compile(r"\b(?:let|var)\s+([a-z]\w*)")
 CLOSURE_PARAMS_RE = re.compile(r"^\s*\[[^\]]*\]\s*([^\n]*?)\s+in\b")
 
@@ -588,6 +595,11 @@ def check_explicit_self(module: Module, sources: dict[str, str], findings: list[
                 continue
 
             for capture in SELF_CAPTURE_RE.finditer(body):
+                # A Task that already carries a capture list is covered by the
+                # other branch; matching it twice would report it twice.
+                if body[capture.start():capture.end() + 12].lstrip().startswith("Task") \
+                        and re.match(r"[^{]*\{\s*(?:@\w+\s*)?\[", body[capture.start():capture.end() + 40]):
+                    continue
                 brace = body.find("{", capture.start())
                 depth, closing = 0, brace
                 for index in range(brace, len(body)):
