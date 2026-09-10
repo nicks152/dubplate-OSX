@@ -10,6 +10,11 @@ public struct ImportOutcome: Sendable {
     public var repairedFilenames: [String] = []
     public var failures: [DubplateError] = []
 
+    /// A memberwise initialiser is internal even when every property is public, so
+    /// without this the applications cannot build an empty outcome to accumulate
+    /// into — which is exactly what a multi-file drop does.
+    public init() {}
+
     public var isEmpty: Bool {
         createdTracks.isEmpty && addedVersions.isEmpty
     }

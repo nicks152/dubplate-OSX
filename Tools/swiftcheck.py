@@ -569,6 +569,53 @@ def check_own_members(module: Module, sources: dict[str, str], allow: set[str],
 # explicit capture list, and an escaping closure with none at all — `Task { … }`
 # being overwhelmingly the common case. The second is the one that is easy to miss,
 # because nothing in the syntax announces that self is being captured.
+PUBLIC_STRUCT_RE = re.compile(r"(?m)^public struct (\w+)")
+PUBLIC_INIT_RE = re.compile(r"(?m)^\s*public init\b")
+
+
+def check_public_initialisers(modules: list[Module], sources: dict[str, str],
+                              findings: list[Finding]) -> None:
+    """A public struct built from another module needs a public initialiser.
+
+    Swift's memberwise initialiser is internal even when the type and every one of
+    its properties is public, so a struct that reads as fully public is
+    unconstructable from outside the module that declares it. Nothing about the
+    declaration hints at this, and it only fails at the one call site that tries.
+    """
+    owners: dict[str, tuple[str, bool]] = {}
+    for module in modules:
+        for path in module.files:
+            code = sources[path]
+            for match in PUBLIC_STRUCT_RE.finditer(code):
+                start = code.find("{", match.end())
+                if start == -1:
+                    continue
+                depth, end = 0, start
+                for index in range(start, len(code)):
+                    if code[index] == "{":
+                        depth += 1
+                    elif code[index] == "}":
+                        depth -= 1
+                        if depth == 0:
+                            end = index
+                            break
+                owners[match.group(1)] = (module.name, bool(PUBLIC_INIT_RE.search(code[start:end])))
+
+    for module in modules:
+        for path in module.files:
+            code = sources[path]
+            for name, (owner, has_init) in owners.items():
+                if has_init or owner == module.name:
+                    continue
+                match = re.search(rf"(?<![\w.]){re.escape(name)}\s*\(", code)
+                if match is None:
+                    continue
+                line = code[: match.start()].count("\n") + 1
+                findings.append(Finding(
+                    "error", rel(path), line, "internal-initialiser",
+                    f"'{name}' is built here but its initialiser is internal to {owner}"))
+
+
 SELF_CAPTURE_RE = re.compile(
     r"\{\s*\[\s*(?:weak\s+|unowned\s+)?self\s*\]"
     r"|\bTask\s*(?:\.detached\s*\([^)]*\))?\s*\{"
@@ -892,6 +939,7 @@ def main() -> int:
             check_log_messages(open(path, encoding="utf-8").read(), path, 1, findings)
     for module in modules:
         check_explicit_self(module, sources, findings)
+    check_public_initialisers(modules, sources, findings)
     check_environment_objects(modules, sources, findings)
     for module in modules:
         check_swiftui_only_members(module, sources, findings)
