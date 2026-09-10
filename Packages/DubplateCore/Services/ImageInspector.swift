@@ -66,6 +66,21 @@ public enum ImageInspector {
         )
     }
 
+    /// A decoded image no larger than `maxPixel` on its longest edge.
+    ///
+    /// ImageIO downsamples while decoding, so displaying a 6000px cover in a 200pt
+    /// grid cell never allocates a 6000px bitmap.
+    public static func cgImage(ofFileAt url: URL, maxPixel: Int) -> CGImage? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixel
+        ]
+        return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
+    }
+
     private static func encodeJPEG(_ image: CGImage, quality: Double = 0.82) -> Data? {
         let output = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(

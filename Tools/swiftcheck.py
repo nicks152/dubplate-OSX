@@ -144,7 +144,7 @@ class Module:
     path: str
     deps: list[str] = field(default_factory=list)
     files: list[str] = field(default_factory=list)
-    declarations: dict[str, tuple[str, int]] = field(default_factory=dict)
+    declarations: dict[str, tuple[str, int, frozenset]] = field(default_factory=dict)
     resolvable: set[str] = field(default_factory=set)
 
 
@@ -227,6 +227,39 @@ def check_balance(path: str, code: str, findings: list[Finding]) -> None:
                                 f"'{ch}' opened here is never closed"))
 
 
+def branch_signatures(code: str) -> list[frozenset]:
+    """Signature per line describing which #if branch that line sits in.
+
+    Two declarations of the same name are only a real clash when they can both be
+    compiled: a `#if os(iOS)` typealias and its `#else` twin cannot.
+    """
+    signatures: list[frozenset] = []
+    stack: list[tuple[int, int]] = []
+    block_id = 0
+    for line in code.split("\n"):
+        stripped = line.strip()
+        if stripped.startswith("#if"):
+            block_id += 1
+            stack.append((block_id, 0))
+        elif stripped.startswith("#elseif") or stripped.startswith("#else"):
+            if stack:
+                current, branch = stack[-1]
+                stack[-1] = (current, branch + 1)
+        elif stripped.startswith("#endif"):
+            if stack:
+                stack.pop()
+        signatures.append(frozenset(stack))
+    return signatures
+
+
+def mutually_exclusive(lhs: frozenset, rhs: frozenset) -> bool:
+    left = dict(lhs)
+    for block, branch in rhs:
+        if block in left and left[block] != branch:
+            return True
+    return False
+
+
 def collect_declarations(module: Module, sources: dict[str, str], findings: list[Finding]) -> None:
     """Index every declaration, qualifying nested types by their enclosing type.
 
@@ -235,6 +268,7 @@ def collect_declarations(module: Module, sources: dict[str, str], findings: list
     """
     for path in module.files:
         code = sources[path]
+        signatures = branch_signatures(code)
         stack: list[tuple[str, int]] = []
         for match in DECL_RE.finditer(code):
             name = match.group(2)
@@ -247,13 +281,15 @@ def collect_declarations(module: Module, sources: dict[str, str], findings: list
             if match.group(1) != "typealias":
                 stack.append((name, depth))
             module.resolvable.add(name)
+            signature = signatures[line - 1] if line - 1 < len(signatures) else frozenset()
             if qualified in module.declarations:
-                prev_path, prev_line = module.declarations[qualified]
-                findings.append(Finding(
-                    "error", rel(path), line, "duplicate-decl",
-                    f"'{qualified}' is already declared at {prev_path}:{prev_line}"))
+                prev_path, prev_line, prev_signature = module.declarations[qualified]
+                if not (prev_path == rel(path) and mutually_exclusive(prev_signature, signature)):
+                    findings.append(Finding(
+                        "error", rel(path), line, "duplicate-decl",
+                        f"'{qualified}' is already declared at {prev_path}:{prev_line}"))
             else:
-                module.declarations[qualified] = (rel(path), line)
+                module.declarations[qualified] = (rel(path), line, signature)
 
 
 def check_imports(module: Module, sources: dict[str, str], first_party: set[str],

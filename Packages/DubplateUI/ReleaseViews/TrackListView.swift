@@ -1,0 +1,87 @@
+import SwiftUI
+import DubplateCore
+
+/// A release's track list.
+///
+/// Reorder is a drag, not a mode: there is no edit button to find, because
+/// sequencing a record is the single thing people do most in Dubplate. Dropping a
+/// bounce onto a row is how a mix gets replaced, which is the second.
+public struct TrackListView: View {
+    private let tracks: [Track]
+    private let currentTrackID: UUID?
+    private let isPlaying: Bool
+    private let allowsReordering: Bool
+    @Binding private var selection: UUID?
+    private let onPlay: (Track) -> Void
+    private let onMove: ((IndexSet, Int) -> Void)?
+    private let onDropAudio: ((Track, [URL]) -> Void)?
+    private let onDelete: ((Track) -> Void)?
+
+    public init(
+        tracks: [Track],
+        currentTrackID: UUID?,
+        isPlaying: Bool,
+        selection: Binding<UUID?>,
+        allowsReordering: Bool = true,
+        onPlay: @escaping (Track) -> Void,
+        onMove: ((IndexSet, Int) -> Void)? = nil,
+        onDropAudio: ((Track, [URL]) -> Void)? = nil,
+        onDelete: ((Track) -> Void)? = nil
+    ) {
+        self.tracks = tracks
+        self.currentTrackID = currentTrackID
+        self.isPlaying = isPlaying
+        self._selection = selection
+        self.allowsReordering = allowsReordering
+        self.onPlay = onPlay
+        self.onMove = onMove
+        self.onDropAudio = onDropAudio
+        self.onDelete = onDelete
+    }
+
+    public var body: some View {
+        List(selection: $selection) {
+            ForEach(tracks) { track in
+                TrackRow(
+                    track: track,
+                    isCurrent: track.id == currentTrackID,
+                    isPlaying: track.id == currentTrackID && isPlaying,
+                    onPlay: { onPlay(track) }
+                )
+                .tag(track.id)
+                .listRowInsets(EdgeInsets(top: 2, leading: DubplateLayout.s, bottom: 2, trailing: DubplateLayout.s))
+                .listRowBackground(rowBackground(for: track))
+                .contentShape(Rectangle())
+                .onTapGesture(count: 2) { onPlay(track) }
+                .onTapGesture { selection = track.id }
+                .dropDestination(for: URL.self) { urls, _ in
+                    guard let onDropAudio else { return false }
+                    let audio = urls.filter { FilenameParser.isAudio($0.lastPathComponent) }
+                    guard !audio.isEmpty else { return false }
+                    onDropAudio(track, audio)
+                    return true
+                }
+                .contextMenu {
+                    Button("Play") { onPlay(track) }
+                    if let onDelete {
+                        Divider()
+                        Button("Remove from Release", role: .destructive) { onDelete(track) }
+                    }
+                }
+            }
+            .onMove { offsets, destination in
+                guard allowsReordering else { return }
+                onMove?(offsets, destination)
+            }
+            .moveDisabled(!allowsReordering)
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .animation(DubplateMotion.standard, value: tracks.map(\.id))
+    }
+
+    private func rowBackground(for track: Track) -> some View {
+        RoundedRectangle(cornerRadius: DubplateLayout.controlRadius - 2, style: .continuous)
+            .fill(selection == track.id ? DubplateColor.sunken : .clear)
+    }
+}

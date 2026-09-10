@@ -1,0 +1,164 @@
+import SwiftUI
+import DubplateCore
+
+/// What a screen says when there is nothing on it yet.
+///
+/// No illustration, no icon: a line of type and the one thing to do next. Empty
+/// states are where a product's voice is most audible, so Dubplate's are written
+/// like an instruction from someone who has done this before.
+public struct EmptyState: View {
+    private let headline: String
+    private let message: String
+    private let actionTitle: String?
+    private let action: (() -> Void)?
+
+    public init(
+        headline: String,
+        message: String,
+        actionTitle: String? = nil,
+        action: (() -> Void)? = nil
+    ) {
+        self.headline = headline
+        self.message = message
+        self.actionTitle = actionTitle
+        self.action = action
+    }
+
+    public var body: some View {
+        VStack(spacing: DubplateLayout.m) {
+            Text(headline)
+                .font(.system(size: 20, weight: .semibold))
+                .kerning(-0.2)
+                .foregroundStyle(DubplateColor.primaryText)
+            Text(message)
+                .font(DubplateType.rowSubtitle)
+                .foregroundStyle(DubplateColor.secondaryText)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 320)
+            if let actionTitle, let action {
+                Button(actionTitle, action: action)
+                    .buttonStyle(DubplateFilledButtonStyle())
+                    .padding(.top, DubplateLayout.s)
+            }
+        }
+        .padding(DubplateLayout.xxl)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .contain)
+    }
+}
+
+/// The one filled button in the product.
+public struct DubplateFilledButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.isEnabled) private var isEnabled
+
+    public init() {}
+
+    public func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(DubplateColor.ground)
+            .padding(.horizontal, DubplateLayout.l)
+            .frame(height: 32)
+            .background(DubplateColor.primaryText.opacity(isEnabled ? 1 : 0.4), in: Capsule())
+            .opacity(configuration.isPressed ? 0.82 : 1)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
+            .animation(DubplateMotion.respecting(reduceMotion, DubplateMotion.quick), value: configuration.isPressed)
+    }
+}
+
+/// The quiet one next to it.
+public struct DubplateQuietButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
+    public init() {}
+
+    public func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(DubplateColor.primaryText.opacity(isEnabled ? 1 : 0.4))
+            .padding(.horizontal, DubplateLayout.l)
+            .frame(height: 32)
+            .background(DubplateColor.sunken, in: Capsule())
+            .opacity(configuration.isPressed ? 0.75 : 1)
+    }
+}
+
+/// A titled band above a list or grid.
+public struct SectionHeader<Trailing: View>: View {
+    private let title: String
+    private let trailing: Trailing
+
+    public init(_ title: String, @ViewBuilder trailing: () -> Trailing = { EmptyView() }) {
+        self.title = title
+        self.trailing = trailing()
+    }
+
+    public var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(title)
+                .dubplateLabelStyle(DubplateColor.secondaryText)
+            Spacer()
+            trailing
+        }
+        .accessibilityAddTraits(.isHeader)
+    }
+}
+
+/// The line Dubplate uses to report an error, everywhere.
+public struct ErrorBanner: View {
+    private let error: DubplateError
+    private let onRetry: (() -> Void)?
+    private let onDismiss: () -> Void
+
+    public init(error: DubplateError, onRetry: (() -> Void)? = nil, onDismiss: @escaping () -> Void) {
+        self.error = error
+        self.onRetry = onRetry
+        self.onDismiss = onDismiss
+    }
+
+    public var body: some View {
+        HStack(alignment: .top, spacing: DubplateLayout.m) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(error.title)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(DubplateColor.primaryText)
+                Text(subject)
+                    .font(DubplateType.metadata)
+                    .foregroundStyle(DubplateColor.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: DubplateLayout.s)
+            if let onRetry, let retryTitle = error.retryTitle {
+                Button(retryTitle, action: onRetry)
+                    .buttonStyle(DubplateQuietButtonStyle())
+            }
+            Button {
+                onDismiss()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(DubplateColor.secondaryText)
+                    .frame(width: 28, height: 28)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Dismiss")
+        }
+        .padding(DubplateLayout.l)
+        .background(DubplateColor.raised, in: RoundedRectangle(cornerRadius: DubplateLayout.controlRadius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: DubplateLayout.controlRadius, style: .continuous)
+                .strokeBorder(DubplateColor.hairline)
+        }
+        .shadow(color: .black.opacity(0.24), radius: 20, y: 8)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("\(error.title). \(subject)")
+    }
+
+    private var subject: String {
+        if let name = error.subject {
+            return "\(name) — \(error.detail)"
+        }
+        return error.detail
+    }
+}

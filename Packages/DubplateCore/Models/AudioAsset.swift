@@ -79,6 +79,11 @@ public final class AudioAsset {
         format.summary
     }
 
+    /// "24-bit / 48 kHz" — the denser form for inline metadata lines.
+    public var compactFormat: String {
+        format.compactSummary
+    }
+
     /// "-10.8 LUFS", or `nil` while the value has not been measured.
     public var loudnessSummary: String? {
         guard let integratedLoudness, integratedLoudness.isFinite else { return nil }

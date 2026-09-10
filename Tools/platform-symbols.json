@@ -154,7 +154,19 @@
     "ID",
     "T",
     "U",
-    "V"
+    "V",
+    "Configuration",
+    "AnimatableData",
+    "Coordinator",
+    "NSViewType",
+    "UIViewType",
+    "NSViewControllerType",
+    "UIViewControllerType",
+    "Cache",
+    "Placeholder",
+    "Subview",
+    "Context",
+    "AnyClass"
   ],
   "foundation": [
     "AttributedString",
@@ -256,7 +268,9 @@
     "URLError",
     "CancellationError",
     "DecodingError",
-    "EncodingError"
+    "EncodingError",
+    "NSCoder",
+    "NSNotificationName"
   ],
   "swiftui": [
     "Alignment",
@@ -759,6 +773,12 @@
     "CFData",
     "CFURL",
     "CFNumber",
-    "NSMutableData"
+    "NSMutableData",
+    "NSView",
+    "UIView",
+    "AVPlayerLayer",
+    "CALayer",
+    "NSRect",
+    "CGColorSpace"
   ]
 }
