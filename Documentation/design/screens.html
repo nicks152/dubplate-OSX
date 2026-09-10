@@ -169,7 +169,9 @@ const sidebar = (active) => `
   <div class="item" style="color:var(--tertiary)"><span class="glyph">+</span>New Release</div>
 </div>`;
 const mini = (t, a) => `
-<div class="mini">
+<div class="mini" style="position:relative">
+  <div style="position:absolute;top:0;left:0;right:0;height:2px;background:var(--hairline)"></div>
+  <div style="position:absolute;top:0;left:0;width:34%;height:2px;background:rgba(244,243,241,0.45)"></div>
   <span style="width:30px;height:30px;border-radius:4px;flex:none;background:linear-gradient(135deg,${shades('NO SIGNAL')[0]},${shades('NO SIGNAL')[1]})"></span>
   <div style="min-width:0"><div style="font-size:13px;font-weight:500">${t}</div>
   <div class="meta">${a}</div></div>
@@ -208,17 +210,23 @@ ${sidebar('Albums')}
           <div class="label">Album</div>
           <div class="display-44">NO SIGNAL</div>
           <div style="font-size:18px;font-weight:500;color:var(--secondary)">Nick Loder</div>
-          <div class="meta">Album · 10 tracks · 2026 · 35 minutes</div>
+          <div class="meta">10 tracks · 2026 · 35 minutes</div>
           <div style="display:flex;gap:12px;margin-top:4px">
             <span class="filled">▶ Play</span><span class="quiet">⤨ Shuffle</span>
           </div>
+        </div>
+      </div>
+      <div style="padding:0 24px 12px">
+        <div style="display:flex;align-items:center;gap:8px;background:var(--sunken);border-radius:8px;
+                    padding:8px 12px;color:var(--secondary);font-size:12px">
+          <span>⌁</span><span>Track 4 is 44.1 kHz after 48 kHz. That join won’t be gapless — re-bounce it to match.</span>
         </div>
       </div>
       <div style="padding:0 24px;overflow:hidden">
         ${NO_SIGNAL.map((t,i) => `<div class="track ${i===5?'sel':''}">
           <span class="num">${i===5?'<span class="bars"><i style="height:4px"></i><i style="height:10px"></i><i style="height:6px"></i></span>':(i+1)}</span>
           <span class="name" style="${i===5?'color:var(--primary)':''}">${t}</span>
-          ${i===5?'<span class="pill">v5 · 4</span>':''}
+          ${i===5?'<span class="pill">4 mixes</span>':''}
           <span class="dur">${DURS[i]}</span></div>`).join('')}
       </div>
     </div>
@@ -244,40 +252,50 @@ ${sidebar('Albums')}
   ${mini('Midnight','Nick Loder')}
 </div>`);
 
-/* 3. Mac versions */
-screen('mac-versions', 'Mac · Versions', 'mac', `
-${sidebar('Albums')}
-<div class="detail" style="position:relative">
-  <div class="toolbar"></div>
-  <div style="padding:32px;opacity:0.25;pointer-events:none">
-    <div class="display-44">NO SIGNAL</div>
-  </div>
-  <div style="position:absolute;inset:0;background:rgba(0,0,0,0.45)"></div>
-  <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:620px;background:var(--raised);
-              border-radius:14px;padding:32px;display:flex;flex-direction:column;gap:24px;
-              box-shadow:0 24px 60px rgba(0,0,0,0.5)">
-    <div style="display:flex;align-items:flex-start">
-      <div><div class="label">Versions</div><div class="display-22" style="margin-top:2px">Midnight</div></div>
-      <div style="flex:1"></div><span class="quiet">Done</span>
+/* 3. Mac versions — a pane of the inspector, so the transport stays reachable */
+const versionRow = (n, l, d, src, current) => `
+  <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border-radius:8px;
+              ${current ? 'background:var(--sunken)' : ''}">
+    <span style="width:20px;text-align:center;color:${current ? 'var(--primary)' : 'var(--secondary)'};font-size:11px">▶</span>
+    <div style="min-width:0;flex:1">
+      <div><span class="meta" style="margin-right:6px;color:${current ? 'var(--primary)' : 'var(--tertiary)'}">${n}</span><span class="row-title">${l}</span></div>
+      <div class="meta" style="margin-top:1px">${d}</div>
+      <div class="meta" style="margin-top:1px;opacity:0.8">${src}</div>
     </div>
-    <div>
-      <div class="label" style="margin-bottom:8px">Current</div>
-      <div style="display:flex;align-items:center;gap:12px;background:var(--sunken);border-radius:8px;padding:8px 12px">
-        <span style="width:22px;text-align:center">▶</span>
-        <div><div><span class="meta" style="margin-right:8px">v5</span><span class="row-title">Mix 5</span></div>
-          <div class="meta" style="margin-top:1px">3:42 · 24-bit / 48 kHz · -10.8 LUFS</div></div>
-        <div style="flex:1"></div><span style="color:var(--secondary)">⋯</span>
+    ${current ? '' : '<span class="quiet" style="height:24px;font-size:11px;padding:0 10px">Make Current</span>'}
+    <span style="color:var(--secondary)">⋯</span>
+  </div>`;
+screen('mac-versions', 'Mac · Mixes (inspector pane)', 'mac', `
+${sidebar('Albums')}
+<div class="detail">
+  <div class="toolbar"></div>
+  <div style="display:flex;flex:1;min-height:0">
+    <div style="flex:1;display:flex;flex-direction:column;min-width:0;padding:32px">
+      <div class="display-44">NO SIGNAL</div>
+      <div class="meta" style="margin-top:8px">10 tracks · 2026 · 35 minutes</div>
+      <div style="margin-top:24px">
+        ${NO_SIGNAL.slice(0,7).map((t,i) => `<div class="track ${i===5?'sel':''}">
+          <span class="num">${i===5?'<span class="bars"><i style="height:4px"></i><i style="height:10px"></i><i style="height:6px"></i></span>':(i+1)}</span>
+          <span class="name">${t}</span>${i===5?'<span class="pill" style="background:var(--primary);color:var(--ground)">4 mixes</span>':''}
+          <span class="dur">${DURS[i]}</span></div>`).join('')}
       </div>
     </div>
-    <div>
-      <div class="label" style="margin-bottom:8px">Previous</div>
-      ${[['v4','Mix 4','3:41 · 24-bit / 48 kHz'],['v3','Mix 3','3:44 · 24-bit / 48 kHz'],['v2','Rough','3:52 · 24-bit / 44.1 kHz']]
-        .map(([n,l,d]) => `<div style="display:flex;align-items:center;gap:12px;padding:8px 12px">
-          <span style="width:22px;text-align:center;color:var(--secondary)">▶</span>
-          <div><div><span class="meta" style="margin-right:8px">${n}</span><span class="row-title">${l}</span></div>
-            <div class="meta" style="margin-top:1px">${d}</div></div>
-          <div style="flex:1"></div><span class="quiet" style="height:26px;font-size:12px">Make Current</span>
-          <span style="color:var(--secondary)">⋯</span></div>`).join('<div class="rule"></div>')}
+    <div class="inspector" style="width:340px;padding:0;gap:0">
+      <div style="padding:12px;display:flex;gap:2px">
+        <span style="flex:1;text-align:center;font-size:12px;padding:4px;border-radius:6px;color:var(--secondary)">Track</span>
+        <span style="flex:1;text-align:center;font-size:12px;padding:4px;border-radius:6px;background:var(--sunken)">Mixes (4)</span>
+      </div>
+      <div class="rule"></div>
+      <div style="padding:16px;display:flex;flex-direction:column;gap:16px">
+        <div><div class="label" style="margin-bottom:6px">Current</div>
+          ${versionRow('v5','Mix 5','Yesterday · 3:42 · 24-bit / 48 kHz · -10.8 LUFS','NO SIGNAL Bounces/06 Midnight mix 5.wav', true)}</div>
+        <div><div class="label" style="margin-bottom:6px">Previous</div>
+          ${versionRow('v4','Mix 4','3 days ago · 3:41 · 24-bit / 48 kHz','NO SIGNAL Bounces/06 Midnight mix 4.wav', false)}
+          <div class="rule" style="margin:2px 10px"></div>
+          ${versionRow('v3','Mix 3','last week · 3:44 · 24-bit / 48 kHz','NO SIGNAL Bounces/06 Midnight mix 3.wav', false)}
+          <div class="rule" style="margin:2px 10px"></div>
+          ${versionRow('v2','Rough','2 weeks ago · 3:52 · 24-bit / 44.1 kHz','Ideas/midnight rough.wav', false)}</div>
+      </div>
     </div>
   </div>
   ${mini('Midnight','Nick Loder')}
@@ -307,7 +325,8 @@ screen('phone-home', 'iPhone · Home', 'phone', `
 <div style="padding:16px 16px 0;height:100%;display:flex;flex-direction:column">
   <div style="height:44px"></div>
   <div class="display-30" style="margin-bottom:16px">Dubplate</div>
-  ${art('NO SIGNAL', 361, 10)}
+  <div class="label" style="margin-bottom:12px">Recently Played</div>
+  <div style="display:flex;justify-content:center">${art('NO SIGNAL', 300, 10)}</div>
   <div style="display:flex;align-items:flex-end;margin-top:16px">
     <div><div class="display-26">NO SIGNAL</div>
       <div style="font-size:15px;color:var(--secondary);margin-top:2px">Nick Loder</div>
@@ -334,14 +353,14 @@ screen('phone-home', 'iPhone · Home', 'phone', `
 /* 6. Phone release */
 screen('phone-release', 'iPhone · Release', 'phone', `
 <div style="padding:0 16px;height:100%;overflow:hidden;display:flex;flex-direction:column">
-  <div style="height:52px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600">NO SIGNAL</div>
+  <div style="height:52px;display:flex;align-items:center;padding-left:4px;color:var(--secondary)">‹</div>
   <div style="display:flex;flex-direction:column;align-items:center;gap:16px;margin-top:8px">
     ${art('NO SIGNAL', 260, 10)}
     <div style="text-align:center">
       <div class="label">Album</div>
       <div class="display-30" style="margin-top:4px">NO SIGNAL</div>
       <div style="font-size:16px;font-weight:500;color:var(--secondary);margin-top:4px">Nick Loder</div>
-      <div class="meta" style="margin-top:4px">Album · 10 tracks · 2026 · 35 minutes</div>
+      <div class="meta" style="margin-top:4px">10 tracks · 2026 · 35 minutes</div>
     </div>
     <div style="display:flex;gap:12px"><span class="filled">▶ Play</span><span class="quiet">⤨ Shuffle</span></div>
   </div>
@@ -349,7 +368,7 @@ screen('phone-release', 'iPhone · Release', 'phone', `
     ${NO_SIGNAL.slice(0,6).map((t,i) => `<div style="display:flex;align-items:center;gap:12px;height:56px;border-bottom:1px solid var(--hairline)">
       <span class="num" style="width:26px">${i===5?'<span class="bars"><i style="height:4px"></i><i style="height:10px"></i><i style="height:6px"></i></span>':(i+1)}</span>
       <span class="name" style="flex:1;font-size:14px;${i===5?'color:var(--primary)':''}">${t}</span>
-      ${i===5?'<span class="pill">v5 · 4</span><span style="color:var(--tertiary);padding:0 8px">⋯</span>':''}
+      ${i===5?'<span class="pill">4 mixes</span><span style="color:var(--tertiary);padding:0 8px">⋯</span>':''}
       <span class="dur">${DURS[i]}</span></div>`).join('')}
   </div>
 </div>`);
