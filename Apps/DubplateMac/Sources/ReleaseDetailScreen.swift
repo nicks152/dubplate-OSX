@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
+import DubplateAudio
 import DubplateCore
 import DubplateUI
 

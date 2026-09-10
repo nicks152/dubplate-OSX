@@ -339,11 +339,24 @@ def visible_names(module: Module, modules: dict[str, Module], sources: dict[str,
 
 def check_type_references(module: Module, modules: dict[str, Module], sources: dict[str, str],
                           allow: set[str], findings: list[Finding]) -> None:
-    known = visible_names(module, modules, sources) | allow
+    """Resolve every capitalised name against what *this file* can actually see.
+
+    Per file, not per module. Swift does not re-export: a type from DubplateAudio is
+    visible in a file that imports DubplateAudio and in no other, even when the
+    module as a whole depends on it and a file three doors down imports it. Resolving
+    against the module's dependency list instead was why every application file could
+    name `PlayerController` while none of them imported the module it lives in.
+    """
     for path in module.files:
+        raw = sources[path]
+        known = set(module.resolvable) | allow
+        for imported in IMPORT_RE.findall(raw):
+            head = imported.split(".")[0]
+            if head in modules:
+                known |= modules[head].resolvable
         # Import lines are validated by check_imports; blank them so a module name
         # is not mistaken for a type reference.
-        code = IMPORT_RE.sub(lambda m: " " * len(m.group(0)), sources[path])
+        code = IMPORT_RE.sub(lambda m: " " * len(m.group(0)), raw)
         local = set()
         for match in GENERIC_PARAM_RE.finditer(code):
             for part in match.group(1).split(","):
@@ -361,7 +374,7 @@ def check_type_references(module: Module, modules: dict[str, Module], sources: d
             findings.append(Finding(
                 "error", rel(path), line, "unknown-type",
                 f"'{name}' does not resolve to a declaration in {module.name}, "
-                f"its dependencies, or the platform allowlist"))
+                f"a module this file imports, or the platform allowlist"))
 
 
 MODEL_BLOCK_RE = re.compile(r"(?m)^@Model\b")

@@ -1,6 +1,8 @@
 import SwiftUI
 import SwiftData
+import DubplateAudio
 import DubplateCore
+import DubplateSync
 import DubplateUI
 
 /// The sidebar.

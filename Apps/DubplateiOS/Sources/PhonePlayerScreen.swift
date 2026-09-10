@@ -1,5 +1,7 @@
 import SwiftUI
+import DubplateAudio
 import DubplateCore
+import DubplateSync
 import DubplateUI
 
 /// The player, full screen.

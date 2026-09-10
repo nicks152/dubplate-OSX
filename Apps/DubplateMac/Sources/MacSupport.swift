@@ -1,6 +1,8 @@
 import SwiftUI
 import AppKit
+import DubplateAudio
 import DubplateCore
+import DubplateSync
 import DubplateUI
 
 /// "Show in Finder".

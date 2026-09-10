@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import DubplateAudio
 import DubplateCore
 import DubplateUI
 
@@ -18,46 +19,59 @@ struct PhoneReleaseScreen: View {
     @State private var versionsTrack: Track?
     @State private var isDownloading = false
 
+    /// Split at `some View` boundaries. As one expression — a ScrollView holding a
+    /// header with two closures, plus a sheet builder holding four more — the
+    /// type-checker gives up rather than solving it.
     var body: some View {
+        content
+            .background(DubplateColor.ground)
+            // No navigation title: the release name is the first thing in the
+            // content, and setting both prints it twice.
+            .navigationBarTitleDisplayMode(.inline)
+            .onAppear { services.open(release: release) }
+            .sheet(item: $versionsTrack) { track in
+                versionPicker(for: track)
+            }
+    }
+
+    private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: DubplateLayout.xl) {
-                ReleaseHeaderView(
-                    release: release,
-                    layout: .centred,
-                    artworkEdge: 260,
-                    onPlay: { services.play(release: release) },
-                    onShuffle: { services.play(release: release, shuffled: true) }
-                )
-                .padding(.top, DubplateLayout.s)
-
+                header
                 tracks
-
                 footer
             }
             .padding(.horizontal, DubplateLayout.l)
             .padding(.bottom, DubplateLayout.xl)
         }
-        .background(DubplateColor.ground)
-        // No navigation title: the release name is the first thing in the content,
-        // and setting both prints it twice.
-        .navigationBarTitleDisplayMode(.inline)
-        .onAppear { services.open(release: release) }
-        .sheet(item: $versionsTrack) { track in
-            VersionPickerSheet(
-                track: track,
-                playingVersionID: player.currentItem?.versionID,
-                onSelect: { version in
-                    services.audition(version: version, of: track)
-                },
-                onSetCurrent: { version in
-                    library.makeCurrent(version: version, of: track)
-                    services.refreshQueueEntry(for: track)
-                },
-                onDismiss: { versionsTrack = nil }
-            )
-            .presentationDetents([.medium, .large])
-            .presentationBackground(DubplateColor.playerGround)
-        }
+    }
+
+    private var header: some View {
+        ReleaseHeaderView(
+            release: release,
+            layout: .centred,
+            artworkEdge: 260,
+            onPlay: { services.play(release: release) },
+            onShuffle: { services.play(release: release, shuffled: true) }
+        )
+        .padding(.top, DubplateLayout.s)
+    }
+
+    private func versionPicker(for track: Track) -> some View {
+        VersionPickerSheet(
+            track: track,
+            playingVersionID: player.currentItem?.versionID,
+            onSelect: { version in
+                services.audition(version: version, of: track)
+            },
+            onSetCurrent: { version in
+                library.makeCurrent(version: version, of: track)
+                services.refreshQueueEntry(for: track)
+            },
+            onDismiss: { versionsTrack = nil }
+        )
+        .presentationDetents([.medium, .large])
+        .presentationBackground(DubplateColor.playerGround)
     }
 
     private var tracks: some View {
@@ -71,9 +85,7 @@ struct PhoneReleaseScreen: View {
                             track: track,
                             isCurrent: player.currentItem?.trackID == track.id,
                             isPlaying: player.currentItem?.trackID == track.id && player.isPlaying,
-                            playingVersionID: player.currentItem?.trackID == track.id
-                                ? player.currentItem?.versionID
-                                : nil,
+                            playingVersionID: playingVersion(of: track),
                             onPlay: { services.play(release: release, startingAt: track) }
                         )
                         .contentShape(Rectangle())
@@ -230,5 +242,13 @@ struct DownloadButton: View {
         case .onlyCopyHere:
             break
         }
+    }
+
+    /// The mix being heard for this track, or nil when this is not the track that
+    /// is playing. Lifted out of the row's argument list, where it was a ternary
+    /// over two optional chains inside a call inside a ForEach.
+    private func playingVersion(of track: Track) -> UUID? {
+        guard player.currentItem?.trackID == track.id else { return nil }
+        return player.currentItem?.versionID
     }
 }

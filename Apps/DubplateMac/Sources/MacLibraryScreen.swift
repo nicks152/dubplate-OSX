@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import DubplateAudio
 import DubplateCore
 import DubplateUI
 
