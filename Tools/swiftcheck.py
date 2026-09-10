@@ -550,6 +550,9 @@ def check_own_members(module: Module, sources: dict[str, str], allow: set[str],
 
 ENVIRONMENT_USE_RE = re.compile(r"@Environment\(\s*([A-Z][A-Za-z0-9_]*)\.self\s*\)")
 ENVIRONMENT_INJECT_RE = re.compile(r"\.environment\(\s*([A-Za-z0-9_.]+)")
+OBSERVABLE_CLASS_RE = re.compile(
+    r"@Observable[\s\S]{0,200}?\b(?:final\s+)?class\s+([A-Z][A-Za-z0-9_]*)"
+)
 
 
 def check_environment_objects(modules: list[Module], sources: dict[str, str],
@@ -594,6 +597,28 @@ def check_environment_objects(modules: list[Module], sources: dict[str, str],
 
     by_name = {m.name: m for m in modules}
     shared = by_name.get("DubplateUI")
+
+    # Anything handed to `.environment(x)` must be @Observable: the object overload
+    # requires the conformance, and a class that merely looks like the five beside
+    # it compiles everywhere except the one line that injects it.
+    observable: set[str] = set()
+    for module in modules:
+        for path in module.files:
+            for match in OBSERVABLE_CLASS_RE.finditer(sources[path]):
+                observable.add(match.group(1))
+    for name, aliased in aliases.items():
+        if name in observable:
+            continue
+        for module in modules:
+            for path in module.files:
+                for match in ENVIRONMENT_INJECT_RE.finditer(sources[path]):
+                    leaf = match.group(1).split(".")[-1]
+                    if leaf not in aliased and leaf != name[:1].lower() + name[1:]:
+                        continue
+                    line = sources[path][: match.start()].count("\n") + 1
+                    findings.append(Finding(
+                        "error", rel(path), line, "environment-observable",
+                        f"'{name}' is injected into the environment but is not @Observable"))
 
     for app_name in ["DubplateMac", "DubplateiOS"]:
         app = by_name.get(app_name)

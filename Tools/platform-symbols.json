@@ -412,6 +412,7 @@
     "NavigationStack",
     "Observable",
     "ObservableObject",
+    "ObservationIgnored",
     "OpenSettingsAction",
     "OpenURLAction",
     "OpenWindowAction",

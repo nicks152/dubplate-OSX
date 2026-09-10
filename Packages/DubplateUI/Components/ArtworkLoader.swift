@@ -8,10 +8,17 @@ import DubplateCore
 /// library of 4000px covers never decodes a 4000px bitmap. The cache is an
 /// `NSCache`, which means the system evicts it under pressure rather than Dubplate
 /// guessing when to.
+/// `@Observable` because it goes into the environment, which requires it — and
+/// because `isUndecodable` is read inside a view's body, so a cover that turns out
+/// not to decode has to be able to redraw the view that asked.
 @MainActor
+@Observable
 public final class ArtworkLoader {
     private let mediaStore: MediaStore
     private let cache = NSCache<NSString, DubplateImage>()
+    /// Bookkeeping, not state anything draws from, and it churns once per cover on
+    /// every scroll. Nothing should be woken by it.
+    @ObservationIgnored
     private var inFlight: [String: Task<DubplateImage?, Never>] = [:]
     /// Paths whose bytes are on this device and will not decode.
     ///
