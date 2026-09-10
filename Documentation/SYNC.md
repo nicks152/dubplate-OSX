@@ -143,6 +143,44 @@ On top of that flag:
 So the button can never destroy the only copy of a mix, and being wrong about the
 index costs a wasted request rather than a master.
 
+## Turning on iCloud sync
+
+Dubplate ships with sync **off**, because a free Apple Developer account cannot sign
+an application that asks for iCloud or Push Notifications at all — so shipping those
+entitlements by default meant nobody could build it without a paid membership.
+Everything else works without them: library, import, sequencing, artwork, playback,
+versions. The interface says once that it is not syncing.
+
+With a paid membership, sync is four keys per target and a container that exists.
+
+1. In the CloudKit Console, create a container. `iCloud.com.dubplate.app` is the
+   identifier the code expects (`DubplateSchema.cloudContainerIdentifier`); if you
+   use another, change it there.
+2. Add to **both** `Apps/DubplateMac/Resources/Dubplate.entitlements` and
+   `Apps/DubplateiOS/Resources/Dubplate.entitlements`:
+
+   ```xml
+   <key>com.apple.developer.icloud-container-identifiers</key>
+   <array><string>iCloud.com.dubplate.app</string></array>
+   <key>com.apple.developer.icloud-services</key>
+   <array><string>CloudKit</string></array>
+   <key>com.apple.developer.ubiquity-kvstore-identifier</key>
+   <string>$(TeamIdentifierPrefix)$(CFBundleIdentifier)</string>
+   <key>aps-environment</key>
+   <string>development</string>
+   ```
+
+3. Put `remote-notification` back into `UIBackgroundModes` in
+   `Apps/DubplateiOS/Resources/Info.plist`, beside `audio`. CloudKit uses a silent
+   push to say a zone changed; without it the phone only notices on launch.
+4. On the Mac target, `aps-environment` is what earns the same notification there.
+   It is the difference between the Mac seeing the phone's edits immediately and
+   seeing them on relaunch.
+
+Nothing in the code is conditional on any of this. `SyncCoordinator` asks CloudKit
+for the account state, gets a refusal, reports `.offline`, and the library carries on
+being a local library.
+
 ## Failure
 
 | What happens | What Dubplate does |

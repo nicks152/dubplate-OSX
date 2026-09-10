@@ -1,5 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+    Dubplate runs entirely locally out of the box, and this file is why.
+
+    A free Apple Developer account — a "Personal Team" — cannot sign an application
+    that asks for iCloud or Push Notifications at all, so shipping those entitlements
+    by default meant nobody could build Dubplate without a paid membership. They are
+    not here. Nothing else about the application changes: the library, import,
+    sequencing, artwork, playback and versions all work, and the interface says once
+    that it is not syncing.
+
+    To turn sync on, with a paid account, see "Turning on iCloud sync" in
+    Documentation/SYNC.md. It is four keys here and the same four on iOS.
+-->
 <plist version="1.0">
 <dict>
     <key>com.apple.security.app-sandbox</key>
@@ -10,17 +23,5 @@
     <true/>
     <key>com.apple.security.network.client</key>
     <true/>
-    <key>aps-environment</key>
-    <string>development</string>
-    <key>com.apple.developer.icloud-container-identifiers</key>
-    <array>
-        <string>iCloud.com.dubplate.app</string>
-    </array>
-    <key>com.apple.developer.icloud-services</key>
-    <array>
-        <string>CloudKit</string>
-    </array>
-    <key>com.apple.developer.ubiquity-kvstore-identifier</key>
-    <string>$(TeamIdentifierPrefix)$(CFBundleIdentifier)</string>
 </dict>
 </plist>

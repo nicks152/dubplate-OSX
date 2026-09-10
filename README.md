@@ -45,10 +45,15 @@ somewhere else — `Tools/make_app_icon.py` writes both asset catalogs, and the 
 it produces are checked in so a clone builds without running it.
 
 Before the first build on your own machine, set a development team on both
-application targets (Signing & Capabilities). The Mac target needs the Push
-Notifications capability as well as iCloud: CloudKit uses silent push to tell a
-device that a remote zone changed, and without it the Mac only picks up the phone's
-edits on relaunch. iCloud sync additionally needs the
+application targets (Signing & Capabilities). A free Apple ID is enough: **Dubplate
+ships with sync off** so that it builds and runs on a Personal Team, which cannot
+sign an application that asks for iCloud or Push Notifications at all. Everything
+except syncing between devices works — library, import, sequencing, artwork,
+playback, versions — and the interface says once that it is not syncing.
+
+To turn sync on with a paid membership, see *Turning on iCloud sync* in
+`Documentation/SYNC.md`. It is four entitlement keys per target and a container that
+exists in your account. iCloud sync additionally needs the
 `iCloud.com.dubplate.app` container to exist in your developer account; **without
 it Dubplate still runs and still works, entirely locally** — it falls back to a
 local store and says so once.
