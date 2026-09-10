@@ -32,8 +32,13 @@ asks it to. This is also what makes the availability vocabulary honest: a track 
 description has arrived but whose audio has not is precisely what the interface calls
 **"Available on your Mac"**.
 
-The Mac uploads what it imports, immediately. The phone downloads what it is told
-to — by **Download Release**, or by playing something.
+The Mac uploads what it imports, immediately. The phone downloads what it is told to:
+by **Download Release**, or by pressing play — playback holds on a track whose audio
+has not arrived, fetches it, and continues, rather than skipping past it.
+
+Opening a release deliberately does *not* start a download. Browsing ten records on a
+phone must not pull ten albums onto it, which is the whole reason the bytes are
+separate from the catalogue in the first place.
 
 ### Why CloudKit rather than iCloud Drive
 
@@ -127,7 +132,9 @@ so the button can never destroy the only copy of a mix.
 | Signs in later | Everything on the device is queued for upload. |
 | Network drops mid-transfer | `CKSyncEngine` retries on its own schedule; the file index remembers what is still outstanding across a relaunch. |
 | Upload interrupted by a relaunch | Re-queued at launch from the durable index. |
-| iCloud storage full | The upload is deferred and logged; no local file is touched. |
+| iCloud storage full | Reported as "There isn't enough space to store this", and the asset stays marked as not uploaded. `modifyRecords` reports per-record results rather than throwing, so a quota failure that was read as success would have let "Remove Download" delete the only copy of a master. |
+| The person switches iCloud account | The change token is discarded, every asset is marked not-uploaded and re-queued, and **no local file is touched**. |
+| A media zone is deleted on another device | Everything is marked not-uploaded and queued again. Local files stay. |
 | Sync state file unreadable | Discarded, and everything is re-fetched. Slow, correct, never fatal. |
 | Media index unreadable | Rebuilt from the library. Worst case is re-uploading bytes CloudKit already has. |
 | A file has gone missing under Dubplate | Dropped from the upload queue rather than failing that batch and every batch behind it. |

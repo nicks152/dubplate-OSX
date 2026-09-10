@@ -10,12 +10,16 @@ What *has* been run, and what it establishes:
 
 | Check | Result | What it establishes |
 | --- | --- | --- |
-| `python3 Tools/swiftcheck.py` | 102 files, 13,100 lines, **0 errors, 0 warnings** | Delimiters balance; no duplicate declarations; every import matches a declared dependency; ~1,900 capitalised identifiers all resolve to a declaration in scope or a reviewed platform symbol; every `@Model` obeys CloudKit's rules; no force unwraps, `try!`, `as!`, `print(`, or oversized files |
+| `python3 Tools/swiftcheck.py` | 105 files, 14,800 lines, **0 errors, 0 warnings** | Delimiters balance; no duplicate declarations; every import matches a declared dependency; ~2,000 capitalised identifiers all resolve to a declaration in scope or a reviewed platform symbol; every `@Model` obeys CloudKit's rules, including that every relationship has an inverse; every `@Environment` read has a matching injection in each application; no force unwraps, `try!`, `as!`, `print(`, or oversized files |
 | `python3 Tools/pbxcheck.py` | 93 objects, 4 targets, **0 problems** | The Xcode project parses as an OpenStep plist; every object reference resolves; every file reference exists on disk; every target has a sources phase and compiles at least one file |
-| `python3 Tools/heuristics_reference.py` | **28/28 cases pass** | The filename and version-matching rules behave as intended on a table of real bounce names |
+| `python3 Tools/heuristics_reference.py` | **35/35 cases pass** | The filename and version-matching rules behave as intended on a table of real bounce names |
 | BS.1770 coefficients, checked numerically | max error 4e-14 vs the published 48 kHz values | The K-weighting filters are correct, so loudness numbers are not all wrong by a constant |
 | Gapless fixture continuity | boundary step 0.028782 vs 0.028794 max in-file | The two halves of the test tone join with no discontinuity, so a click at a track boundary would be the player's fault |
 | WAV fixtures re-parsed with Python's `wave` | all 8 valid | The synthetic audio is well-formed at every rate and depth |
+
+Two of these checks were verified the only way a check can be: by deliberately
+breaking the code — deleting an `.environment()` injection, removing a relationship's
+`inverse:` — and confirming the checker named the exact line that would have failed.
 
 **What that does not establish:** that it compiles. `swiftcheck.py` cannot type-check
 an expression, resolve an overload, or know whether a SwiftUI modifier exists on the

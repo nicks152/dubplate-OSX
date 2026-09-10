@@ -15,6 +15,7 @@ enforced in the model and checked by `Tools/swiftcheck.py`:
 | Every relationship optional | `tracks`, `versions`, `artwork` are all optional, so every read goes through a computed accessor rather than a `!`. |
 | No `.deny` delete rules | Cascade and nullify only. |
 | No ordered relationships | Sequence is an explicit `[String]` of identifiers. |
+| **Every relationship needs an inverse** | Unpaired relationships make the store fail to open, which the fallback path turns into a silent local-only library. `Tools/swiftcheck.py` refuses one. |
 
 ## Entities
 
@@ -26,8 +27,8 @@ so a producer types their name once.
 
 ### Release
 `id · title · artistName · releaseTypeRaw · year? · genre? · copyrightText? · notes? ·
-createdAt · updatedAt · lastPlayedAt? · trackOrder · watchFolderBookmark? ·
-tracks? · artwork? · animatedArtwork?`
+createdAt · updatedAt · lastPlayedAt? · repairedAt? · trackOrder · cachedDuration ·
+watchFolderBookmark? · tracks? · artwork? · animatedArtwork?`
 
 `releaseType` is a computed accessor over a stored raw string. Enums are stored as
 raw values rather than as `Codable` cases so they survive mirroring intact and can be
@@ -38,8 +39,15 @@ anything present in the relationship that the order has never heard of, in creat
 order. That single behaviour is what stops a track added on one device disappearing
 because the other device reordered the record.
 
+`cachedDuration` is denormalised: a grid of a hundred covers reaching for a computed
+run time would fault in every track of every release to draw a subtitle.
+
+`repairedAt` exists so that tidying a record after a merge does not touch `updatedAt`
+— the library is sorted by `updatedAt`, and a repair on open would otherwise reorder
+the shelf under the person.
+
 `watchFolderBookmark` is a security-scoped bookmark. Nothing reads it in V1; it is
-there so watch folders do not require a migration.
+there so watch folders do not require a migration on a mirrored store.
 
 ### Track
 `id · title · artistName · featuredArtists? · trackNumber · discNumber · explicitFlag ·
@@ -65,13 +73,27 @@ are never reused, so "play me v3" keeps meaning the same thing after a deletion.
 `Mix 5` — and can be renamed.
 
 ### AudioAsset
-`id · filename · originalFilename · relativePath · cloudRecordName? · duration ·
+`id · filename · originalFilename · sourceFolder? · relativePath · duration ·
 sampleRate · bitDepth · channelCount · codec · fileSize · createdAt · checksum ·
-availabilityRaw · integratedLoudness? · waveformPeaks?`
+integratedLoudness? · waveformPeaks? · versions?`
+plus two `@Transient` properties: `localPresence` and `transferState`.
 
 `relativePath`, not a URL — see `ARCHITECTURE.md`. `originalFilename` is what the
 file was called in Finder and is what people are shown; `filename` is the name inside
-managed storage and is never displayed.
+managed storage and is never displayed. `sourceFolder` is the folder it was dragged
+from, for display only and never resolved: `Midnight mix 5.wav` exists in six bounce
+folders, and this is how a producer tells which one they are hearing.
+
+**Availability is not stored.** Whether the bytes are on *this* device is a different
+answer on the Mac and on the phone, and a mirrored field meant the phone telling the
+Mac that the Mac's own master was unavailable — and flapping every sync cycle. It is
+established by looking (`MediaAvailability`), once at launch and again when a release
+is opened or a transfer settles. `nil` means "not looked yet" and is treated as
+available; the playback path checks the file itself before opening it.
+
+`versions` is the inverse of `TrackVersion.audioAsset`, and it is a to-many because
+the same master can sit on a single and on the album. Deleting one of those records
+does not remove the file while the other still points at it.
 
 `checksum` is a *signature*: the file size plus SHA-256 over three one-megabyte
 windows from the head, middle and tail. Hashing a gigabyte to notice a re-import
@@ -84,9 +106,12 @@ detail survives 8-bit quantisation — 400 bytes, small enough to live next to t
 asset and sync with it.
 
 ### ArtworkAsset
-`id · kindRaw · filename · originalFilename · relativePath · cloudRecordName? ·
-width · height · fileSize · checksum · createdAt · availabilityRaw · loopStart ·
-loopDuration · mutesSourceAudio · thumbnailData?`
+`id · kindRaw · filename · originalFilename · relativePath · width · height ·
+fileSize · checksum · createdAt · loopStart · loopDuration · thumbnailData?`
+plus the same two `@Transient` availability properties, and four inverse
+relationships — `coverForRelease`, `motionForRelease`, `canvasForTrack`,
+`avatarForProfile` — because a release points at artwork twice and each pairing needs
+its own.
 
 One entity for three roles — cover, release motion, track canvas — because they are
 the same thing to storage and to sync.
