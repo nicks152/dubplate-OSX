@@ -47,6 +47,11 @@ struct PhoneRootView: View {
         }
         .overlay(alignment: .bottom) {
             VStack(spacing: DubplateLayout.s) {
+                if services.downloadBlockedByCellular {
+                    Toast(message: "Waiting for Wi-Fi. Turn on cellular downloads in Settings to fetch this now.") {
+                        services.downloadBlockedByCellular = false
+                    }
+                }
                 if let waiting = player.awaitingDownloadOf {
                     Toast(message: "Downloading “\(waiting.title)” — it’ll start in a moment") {
                         player.abandonPendingItem()

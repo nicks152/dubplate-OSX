@@ -126,14 +126,30 @@ struct SyncStatusLabel: View {
     var body: some View {
         if sync.status.isWorthMentioning {
             HStack(spacing: DubplateLayout.xs) {
-                if sync.status == .syncing {
+                if sync.status == .syncing || sync.status == .downloading {
                     ProgressView().controlSize(.mini)
                 }
-                Text(sync.status.label)
+                Text(label)
                     .font(DubplateType.metadata)
                     .foregroundStyle(DubplateColor.tertiaryText)
+                    .lineLimit(1)
             }
-            .accessibilityLabel("Sync status: \(sync.status.label)")
+            .help(detail)
+            .accessibilityLabel("Sync status: \(label)")
         }
+    }
+
+    /// Names the file rather than saying "Syncing" for the length of an album.
+    private var label: String {
+        guard let transfer = sync.transfers.first else { return sync.status.label }
+        let more = sync.transfers.count - 1
+        let verb = transfer.isUpload ? "Uploading" : "Downloading"
+        return more > 0 ? "\(verb) \(transfer.filename) · \(more) to go" : "\(verb) \(transfer.filename)"
+    }
+
+    private var detail: String {
+        sync.transfers.isEmpty
+            ? sync.status.label
+            : sync.transfers.map(\.filename).joined(separator: "\n")
     }
 }

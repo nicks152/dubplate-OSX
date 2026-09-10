@@ -280,7 +280,8 @@ public final class AppServices {
         )
     }
 
-    /// Total bytes a release would take to hold offline.
+    /// Total bytes a release would take to hold offline — every mix, since that is
+    /// what `download(release:)` fetches.
     public func downloadSize(of release: Release, currentVersionsOnly: Bool = false) -> Int64 {
         release.orderedTracks.reduce(0) { total, track in
             if currentVersionsOnly {

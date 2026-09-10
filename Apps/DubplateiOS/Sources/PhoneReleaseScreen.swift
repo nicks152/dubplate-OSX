@@ -196,7 +196,7 @@ struct DownloadButton: View {
     }
 
     private var totalSize: Int64 {
-        assets.reduce(0) { $0 + $1.fileSize }
+        services.downloadSize(of: release)
     }
 
     private var downloadState: State {
