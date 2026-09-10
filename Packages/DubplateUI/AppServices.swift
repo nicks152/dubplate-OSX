@@ -30,11 +30,17 @@ public final class AppServices {
     /// Set when a download was refused because the switch says not on cellular.
     public var downloadBlockedByCellular = false
 
+    /// - Parameter inspectsDisk: whether to establish what is on this device and
+    ///   clear up after an interrupted import. False for the sample library, whose
+    ///   assets deliberately name files that were never written: looking would
+    ///   correctly conclude that none of the demo record is here, and a preview
+    ///   whose every track offers to download is not showing anyone anything.
     public init(
         container: ModelContainer,
         mediaStore: MediaStore,
         settings: DubplateSettings,
-        startupNotice: DubplateError? = nil
+        startupNotice: DubplateError? = nil,
+        inspectsDisk: Bool = true
     ) {
         self.container = container
         self.mediaStore = mediaStore
@@ -59,8 +65,10 @@ public final class AppServices {
         // What is actually on this device is not stored and not synced, so it has
         // to be established by looking — and before the first frame, not after it,
         // because an asset nobody has looked at yet answers "not here".
-        MediaAvailability.refreshAll(in: context, using: mediaStore)
-        Self.sweepUnreferencedMedia(in: context, using: mediaStore)
+        if inspectsDisk {
+            MediaAvailability.refreshAll(in: context, using: mediaStore)
+            Self.sweepUnreferencedMedia(in: context, using: mediaStore)
+        }
 
         player.didStartRelease = { [weak self] releaseID in
             guard let self, let release = library.release(id: releaseID) else { return }
@@ -161,7 +169,12 @@ public final class AppServices {
             SampleLibrary.populate(container.mainContext)
         }
         let store = MediaStore(root: URL.temporaryDirectory.appending(path: "DubplatePreview"))
-        return AppServices(container: container, mediaStore: store, settings: settings)
+        return AppServices(
+            container: container,
+            mediaStore: store,
+            settings: settings,
+            inspectsDisk: false
+        )
     }
 
     // MARK: - Startup
