@@ -7,7 +7,8 @@ covered by Tests/CoreTests. This file mirrors it rule for rule so the *behaviour
 of the heuristics can be checked against a table of real-world bounce names on any
 machine. Run: python3 Tools/heuristics_reference.py
 """
-import re, sys, unicodedata
+import re
+import unicodedata, sys, unicodedata
 
 VERSION_KEYWORDS = {
     "v","ver","version","mix","mixes","master","mastered","mstr","bounce","take",
@@ -35,7 +36,13 @@ def stem(name):
 
 
 def normalize(text):
-    return "".join(c for c in text.lower() if c.isalnum())
+    # Mirrors FilenameParser.normalize: alphanumerics plus Unicode category So
+    # (emoji and other pictographs), so a record named with a symbol still has a
+    # match key.
+    return "".join(
+        c for c in text.lower()
+        if c.isalnum() or unicodedata.category(c) == "So"
+    )
 
 
 def tokenize(text):

@@ -45,7 +45,8 @@ public struct VersionListView: View {
                 }
             }
 
-            let previous = track.orderedVersions.filter { $0.id != track.currentVersionID }
+            let currentID = track.currentVersion?.id
+            let previous = track.orderedVersions.filter { $0.id != currentID }
             if !previous.isEmpty {
                 VStack(alignment: .leading, spacing: DubplateLayout.s) {
                     SectionHeader("Previous")

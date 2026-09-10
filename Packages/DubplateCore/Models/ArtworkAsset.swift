@@ -72,7 +72,7 @@ public final class ArtworkAsset {
     public var availability: AvailabilityState {
         get {
             if let transferState { return transferState }
-            guard let localPresence else { return .available }
+            guard let localPresence else { return .cloudOnly }
             return localPresence ? .available : .cloudOnly
         }
         set {

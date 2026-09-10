@@ -75,14 +75,16 @@ extension LibraryStore {
     /// Folders are walked first: a bounce folder is the most obvious thing to drag
     /// in, and a handler that only understands loose files refuses it silently.
     public func plan(for urls: [URL], in release: Release?) -> ImportPlan {
-        let files = DroppedFiles.expand(urls)
-        let candidates = files.enumerated().map { ImportCandidate.make(url: $1, dropIndex: $0) }
+        let expansion = DroppedFiles.expanded(urls)
+        let candidates = expansion.files.enumerated().map { ImportCandidate.make(url: $1, dropIndex: $0) }
         let existing = release.map { summaries(for: $0) } ?? []
-        return ImportPlanner.plan(
+        var plan = ImportPlanner.plan(
             candidates: candidates,
             existingTracks: existing,
             nextTrackNumber: (release?.trackCount ?? 0) + 1
         )
+        plan.wasTruncated = expansion.wasTruncated
+        return plan
     }
 
     public func summaries(for release: Release) -> [TrackSummary] {

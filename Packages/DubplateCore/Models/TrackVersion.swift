@@ -38,9 +38,16 @@ public final class TrackVersion {
         self.importedAt = createdAt
     }
 
-    /// `true` when the owning track points at this version.
+    /// `true` when this is the version the track actually plays.
+    ///
+    /// Asks the track rather than comparing identifiers, because `currentVersion`
+    /// heals itself: a version deleted on another device leaves `currentVersionID`
+    /// pointing at nothing and the track falls back to its newest mix. Comparing
+    /// the raw identifier disagreed with that, so the newest version was listed as
+    /// current *and* as previous at the same time, and nothing in the queue was
+    /// marked as playing.
     public var isCurrent: Bool {
-        track?.currentVersionID == id
+        track?.currentVersion?.id == id
     }
 
     public var audioAssetID: UUID? {

@@ -35,8 +35,12 @@ public final class AudioAsset {
     /// Deliberately not persisted and therefore never synced: "is this file here"
     /// is a different answer on the Mac and on the phone, and a stored value would
     /// mean the phone telling the Mac that the Mac's own master is unavailable.
-    /// `nil` means "not looked yet", which is treated as available — the playback
-    /// path checks the file itself before it opens it.
+    /// `nil` means "nobody has looked yet", and is answered as *not here*. A record
+    /// whose catalogue has just arrived from iCloud has no bytes on this device,
+    /// and that is by far the commonest way to reach a `nil` — answering
+    /// "available" put a play button on ten albums a phone did not have. Being
+    /// briefly wrong in the other direction costs one frame of a download badge on
+    /// a Mac, until `MediaAvailability` looks.
     @Transient
     public var localPresence: Bool?
 
@@ -83,7 +87,7 @@ public final class AudioAsset {
     public var availability: AvailabilityState {
         get {
             if let transferState { return transferState }
-            guard let localPresence else { return .available }
+            guard let localPresence else { return .cloudOnly }
             return localPresence ? .available : .cloudOnly
         }
         set {

@@ -56,6 +56,11 @@ public final class AppServices {
         )
         self.analyser = MediaAnalyser(context: context, mediaStore: mediaStore, settings: settings)
 
+        // What is actually on this device is not stored and not synced, so it has
+        // to be established by looking — and before the first frame, not after it,
+        // because an asset nobody has looked at yet answers "not here".
+        MediaAvailability.refreshAll(in: context, using: mediaStore)
+
         player.didStartRelease = { [weak self] releaseID in
             guard let self, let release = library.release(id: releaseID) else { return }
             library.markPlayed(release: release)
@@ -141,9 +146,6 @@ public final class AppServices {
     // MARK: - Startup
 
     public func start() async {
-        // What is actually on this device is not stored and not synced, so it has to
-        // be established by looking — once, at launch, before anything asks.
-        MediaAvailability.refreshAll(in: container.mainContext, using: mediaStore)
         NetworkPath.start()
         await sync.start()
         analyser.analysePending()
@@ -155,12 +157,25 @@ public final class AppServices {
 
     // MARK: - Playback helpers
 
-    /// Plays a whole release from the top.
+    /// Plays a whole release, optionally starting on a particular track.
     public func play(release: Release, startingAt track: Track? = nil, shuffled: Bool = false) {
         open(release: release)
         let items = QueueBuilder.items(for: release)
-        guard !items.isEmpty else { return }
-        let index = track.flatMap { target in items.firstIndex { $0.trackID == target.id } } ?? 0
+        guard !items.isEmpty else {
+            announce("There is no audio on this release yet")
+            return
+        }
+        var index = 0
+        if let track {
+            // A track with no playable version is not in the queue. Falling back to
+            // the first item answered a double-click on track 8 by playing track 1,
+            // which reads as the app ignoring the click.
+            guard let found = items.firstIndex(where: { $0.trackID == track.id }) else {
+                announce("“\(track.displayTitle)” has no audio to play yet")
+                return
+            }
+            index = found
+        }
         player.play(items, startingAt: index, shuffled: shuffled)
     }
 
@@ -260,6 +275,11 @@ public final class AppServices {
         }
         await sync.download(assetIDs: ids)
         MediaAvailability.refresh(release, using: mediaStore)
+        // The attempt is over. Anything still claiming to be downloading is not,
+        // and leaving the word there is a promise the app is not keeping.
+        for asset in assets where asset.transferState == .downloading {
+            asset.transferState = nil
+        }
     }
 
     /// Deletes a release and clears the same bytes out of iCloud.
@@ -298,11 +318,6 @@ public final class AppServices {
         }
     }
 
-    /// Opens a release: repairs it after any merge, works out what is actually here,
-    /// and — on a device that is not the one the record was made on — starts
-    /// fetching what is missing without being asked.
-    ///
-    /// This is what "I made it on the Mac and it was on my phone" has to mean.
     /// Opens a release: repairs it after any merge and works out what is actually
     /// on this device.
     ///

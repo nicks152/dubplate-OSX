@@ -53,6 +53,9 @@ public struct ImportPlan: Sendable {
     public var artwork: [ImportCandidate] = []
     public var motion: [ImportCandidate] = []
     public var rejected: [RejectedFile] = []
+    /// True when the drop held more files than one import will take, so the plan
+    /// covers only the first of them.
+    public var wasTruncated = false
     public var orderingSignal: TrackOrdering.Signal = .filename
 
     public var isEmpty: Bool {
@@ -77,6 +80,7 @@ public struct ImportPlan: Sendable {
         }
         if !artwork.isEmpty { parts.append("artwork") }
         if !motion.isEmpty { parts.append("a looping visual") }
+        if wasTruncated { parts.append("first \(DroppedFiles.perDropLimit) files only") }
         if !rejected.isEmpty {
             parts.append("\(rejected.count) skipped")
         }

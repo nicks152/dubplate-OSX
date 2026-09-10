@@ -118,7 +118,14 @@ public actor MediaTransferService {
     public func download(_ assetIDs: [UUID]) async {
         for assetID in assetIDs {
             guard !cancelled.contains(assetID) else { continue }
-            guard let descriptor = await index.descriptor(for: assetID) else { continue }
+            guard let descriptor = await index.descriptor(for: assetID) else {
+                // Nothing in the index describes this file, so there is nothing to
+                // ask CloudKit for. Returning quietly left whatever asked for the
+                // download showing "Downloading" for the rest of the session.
+                Log.sync.error("No media descriptor for \(assetID.uuidString, privacy: .public); cannot download")
+                await onAvailabilityChanged?(assetID, .missing)
+                continue
+            }
             if mediaStore.exists(relativePath: descriptor.relativePath) {
                 await onAvailabilityChanged?(assetID, .available)
                 continue

@@ -32,7 +32,8 @@ public struct ImportPlanSheet: View {
 
     /// A plan only needs confirming when Dubplate has guessed at something.
     public static func requiresConfirmation(_ plan: ImportPlan) -> Bool {
-        !plan.newVersions.isEmpty || !plan.uncertainVersions.isEmpty || !plan.rejected.isEmpty
+        !plan.newVersions.isEmpty || !plan.uncertainVersions.isEmpty
+            || !plan.rejected.isEmpty || plan.wasTruncated
     }
 
     public var body: some View {
@@ -44,6 +45,19 @@ public struct ImportPlanSheet: View {
                 Text(plan.summary)
                     .font(DubplateType.metadata)
                     .foregroundStyle(DubplateColor.tertiaryText)
+            }
+
+            if plan.wasTruncated {
+                Text(
+                    "That drop held more than \(DroppedFiles.perDropLimit) files. "
+                    + "Dubplate is adding the first \(DroppedFiles.perDropLimit); "
+                    + "drop the rest in afterwards."
+                )
+                .font(DubplateType.metadata)
+                .foregroundStyle(DubplateColor.primaryText)
+                .padding(DubplateLayout.m)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(DubplateColor.sunken, in: RoundedRectangle(cornerRadius: DubplateLayout.controlRadius))
             }
 
             ScrollView {

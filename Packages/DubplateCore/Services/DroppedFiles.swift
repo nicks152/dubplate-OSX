@@ -15,19 +15,48 @@ public enum DroppedFiles {
         "reason", "rpp", "aup3", "dmg", "app", "bundle", "framework", "photoslibrary"
     ]
 
+    /// How many files one drop will take. High enough that no real bounce folder
+    /// reaches it, low enough that a dropped home folder does not stall Finder.
+    public static let perDropLimit = 500
+
+    /// What a drop turned out to contain.
+    public struct Expansion: Sendable {
+        public var files: [URL] = []
+        /// True when the walk stopped at the limit, so some files were left out.
+        /// Silently importing 500 of 900 bounces is indistinguishable from losing
+        /// 400 of them, and a producer would find out weeks later.
+        public var wasTruncated = false
+
+        public init(files: [URL] = [], wasTruncated: Bool = false) {
+            self.files = files
+            self.wasTruncated = wasTruncated
+        }
+    }
+
     /// Files worth importing, from any mixture of files and folders.
+    public static func expand(
+        _ urls: [URL],
+        depth: Int = 2,
+        limit: Int = perDropLimit,
+        fileManager: FileManager = .default
+    ) -> [URL] {
+        expanded(urls, depth: depth, limit: limit, fileManager: fileManager).files
+    }
+
+    /// Files worth importing, and whether the walk had to stop early.
     ///
     /// - Parameter depth: how far to walk into folders. Two levels covers
     ///   `NO SIGNAL/Bounces/*.wav` without turning a dropped home folder into a
     ///   thirty-second stall.
-    public static func expand(
+    public static func expanded(
         _ urls: [URL],
         depth: Int = 2,
-        limit: Int = 500,
+        limit: Int = perDropLimit,
         fileManager: FileManager = .default
-    ) -> [URL] {
+    ) -> Expansion {
         var result: [URL] = []
         var seen = Set<String>()
+        var truncated = false
 
         func add(_ url: URL) {
             let key = url.standardizedFileURL.path(percentEncoded: false)
@@ -37,7 +66,10 @@ public enum DroppedFiles {
         }
 
         func walk(_ url: URL, remaining: Int) {
-            guard result.count < limit else { return }
+            guard result.count < limit else {
+                truncated = true
+                return
+            }
             if isDirectory(url, fileManager: fileManager), !isPackage(url) {
                 guard remaining > 0 else { return }
                 let children = (try? fileManager.contentsOfDirectory(
@@ -56,7 +88,7 @@ public enum DroppedFiles {
         for url in urls {
             walk(url, remaining: depth)
         }
-        return result
+        return Expansion(files: result, wasTruncated: truncated)
     }
 
     /// True when the drop was of folders rather than loose files, which is worth

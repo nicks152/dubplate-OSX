@@ -184,9 +184,21 @@ public enum FilenameParser {
         return stem(of: filename)
     }
 
-    /// Lowercased, alphanumerics only. Used for equality tests between titles.
+    /// Lowercased, with spacing and punctuation removed. Used for equality tests
+    /// between titles.
+    ///
+    /// Pictographs survive. Producers do name records ✧, 🜃 or 💿, and dropping
+    /// every such scalar left the match key empty — so two bounces of the same
+    /// song came in as two separate tracks, which is the one mistake import is
+    /// there to avoid. Only "other symbol" is kept: arithmetic and currency signs
+    /// stay out, as they always were.
     public static func normalize(_ text: String) -> String {
-        String(text.lowercased().unicodeScalars.filter { CharacterSet.alphanumerics.contains($0) })
+        String(
+            text.lowercased().unicodeScalars.filter { scalar in
+                CharacterSet.alphanumerics.contains(scalar)
+                    || scalar.properties.generalCategory == .otherSymbol
+            }
+        )
     }
 
     // MARK: - Steps
