@@ -332,11 +332,11 @@ public final class SyncCoordinator {
         accountTask = Task { [weak self] in
             for await _ in CloudAccount.accountChanges {
                 guard let self else { return }
-                let previous = accountState
-                accountState = await account.state()
-                status = accountState.canSync ? .synced : .offline
-                if previous != accountState {
-                    await handleAccountChange()
+                let previous = self.accountState
+                self.accountState = await self.account.state()
+                self.status = self.accountState.canSync ? .synced : .offline
+                if previous != self.accountState {
+                    await self.handleAccountChange()
                 }
             }
         }

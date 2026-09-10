@@ -411,15 +411,19 @@ def check_swiftdata_models(module: Module, sources: dict[str, str], findings: li
                         "for CloudKit mirroring"))
 
 
+# Modifiers may carry an access-level argument — `public private(set) var x` — which
+# an alternation of bare words silently skips, leaving the property invisible to
+# every rule that asks what a type declares.
+MEMBER_MODIFIERS = (
+    r"(?:(?:public|private|fileprivate|internal|package|open|static|class|final"
+    r"|override|mutating|nonisolated|convenience|lazy|weak|unowned|dynamic)"
+    r"(?:\((?:set|get|unsafe|safe)\))?[ \t]+)*"
+)
 MEMBER_FUNC_RE = re.compile(
-    r"(?m)^[ \t]*(?:@\w+(?:\([^)]*\))?[ \t]*)*"
-    r"(?:public |private |fileprivate |internal |package |static |class |final |override |mutating |nonisolated |convenience )*"
-    r"func\s+(\w+)\s*[(<]"
+    r"(?m)^[ \t]*(?:@\w+(?:\([^)]*\))?[ \t]*)*" + MEMBER_MODIFIERS + r"func\s+(\w+)\s*[(<]"
 )
 MEMBER_VAR_RE = re.compile(
-    r"(?m)^[ \t]*(?:@\w+(?:\([^)]*\))?[ \t]*)*"
-    r"(?:public |private |fileprivate |internal |package |static |class |final |lazy |weak |unowned )*"
-    r"(?:var|let)\s+(\w+)"
+    r"(?m)^[ \t]*(?:@\w+(?:\([^)]*\))?[ \t]*)*" + MEMBER_MODIFIERS + r"(?:var|let)\s+(\w+)"
 )
 BARE_CALL_RE = re.compile(r"(?<![\.\w$])([a-z_][A-Za-z0-9_]*)\s*\(")
 
@@ -546,6 +550,71 @@ def check_own_members(module: Module, sources: dict[str, str], allow: set[str],
                 findings.append(Finding(
                     "error", rel(path), line, "unknown-member",
                     f"'{name}' calls '{called}()', which it does not declare"))
+
+
+SELF_CAPTURE_RE = re.compile(r"\{\s*\[\s*(?:weak\s+|unowned\s+)?self\s*\]")
+LOCAL_BINDING_RE = re.compile(r"\b(?:let|var)\s+([a-z]\w*)")
+CLOSURE_PARAMS_RE = re.compile(r"^\s*\[[^\]]*\]\s*([^\n]*?)\s+in\b")
+
+
+def check_explicit_self(module: Module, sources: dict[str, str], findings: list[Finding]) -> None:
+    """Inside a closure that captures self, members must be written `self.member`.
+
+    `guard let self` unwraps self for the statements after it — not for the guard's
+    own condition, and not for another escaping closure created inside the body.
+    Which of those applies where is subtle enough that the rule here is the blunt
+    one: in a closure that captures self, spell it out.
+    """
+    for path in module.files:
+        code = sources[path]
+        for match in DECL_RE.finditer(code):
+            if match.group(1) not in {"class", "actor"}:
+                continue
+            header_end = code.find("{", match.end())
+            if header_end == -1:
+                continue
+            depth, end = 0, header_end
+            for index in range(header_end, len(code)):
+                if code[index] == "{":
+                    depth += 1
+                elif code[index] == "}":
+                    depth -= 1
+                    if depth == 0:
+                        end = index
+                        break
+            body = code[header_end:end]
+            declared = set(MEMBER_FUNC_RE.findall(body)) | set(MEMBER_VAR_RE.findall(body))
+            if not declared:
+                continue
+
+            for capture in SELF_CAPTURE_RE.finditer(body):
+                brace = body.find("{", capture.start())
+                depth, closing = 0, brace
+                for index in range(brace, len(body)):
+                    if body[index] == "{":
+                        depth += 1
+                    elif body[index] == "}":
+                        depth -= 1
+                        if depth == 0:
+                            closing = index
+                            break
+                closure = body[brace:closing]
+                # Names bound inside the closure shadow the members they match.
+                shadowed = set(LOCAL_BINDING_RE.findall(closure))
+                parameters = CLOSURE_PARAMS_RE.search(closure[1:200] or "")
+                if parameters:
+                    shadowed |= set(re.findall(r"[a-z]\w*", parameters.group(1)))
+                # A member is used by reading it, calling it, or assigning to it.
+                # `==` and `!=` are comparisons, not assignments.
+                for use in re.finditer(r"(?<![\w.$?!<>=+\-*/])([a-z]\w*)\s*(?:[.(]|=(?!=))", closure):
+                    word = use.group(1)
+                    if word not in declared or word in shadowed:
+                        continue
+                    line = code[:header_end].count("\n") + closure[: use.start()].count("\n") \
+                        + body[:brace].count("\n") + 1
+                    findings.append(Finding(
+                        "error", rel(path), line, "implicit-self",
+                        f"'{word}' is used without `self.` inside a closure that captures self"))
 
 
 LOG_CALL_RE = re.compile(
@@ -796,6 +865,8 @@ def main() -> int:
             # The raw file, not `sources`: `strip_noise` blanks string literals,
             # and the literals are the whole point of this one.
             check_log_messages(open(path, encoding="utf-8").read(), path, 1, findings)
+    for module in modules:
+        check_explicit_self(module, sources, findings)
     check_environment_objects(modules, sources, findings)
     for module in modules:
         check_swiftui_only_members(module, sources, findings)

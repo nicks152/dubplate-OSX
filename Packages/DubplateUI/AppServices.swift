@@ -70,18 +70,22 @@ public final class AppServices {
             Self.sweepUnreferencedMedia(in: context, using: mediaStore)
         }
 
+        // `self.` throughout, deliberately. `guard let self` unwraps self for the
+        // statements after it, not for the guard's own condition and not for
+        // another escaping closure created inside the body — and spelling it out
+        // everywhere is cheaper than remembering which of those applies where.
         player.didStartRelease = { [weak self] releaseID in
-            guard let self, let release = library.release(id: releaseID) else { return }
-            library.markPlayed(release: release)
+            guard let self, let release = self.library.release(id: releaseID) else { return }
+            self.library.markPlayed(release: release)
         }
         player.needsDownload = { [weak self] item in
             guard let self else { return }
-            Task { await fetchAndResume(item) }
+            Task { await self.fetchAndResume(item) }
         }
         library.artworkDidChange = { [weak self] _ in
             guard let self else { return }
-            artwork.invalidateAll()
-            player.invalidateArtwork()
+            self.artwork.invalidateAll()
+            self.player.invalidateArtwork()
         }
     }
 

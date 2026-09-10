@@ -100,11 +100,11 @@ public final class PlayerController {
         commands.seek = { [weak self] time in self?.seek(to: time) }
         commands.skipForward = { [weak self] interval in
             guard let self else { return }
-            seek(to: currentTime + interval)
+            self.seek(to: self.currentTime + interval)
         }
         commands.skipBackward = { [weak self] interval in
             guard let self else { return }
-            seek(to: max(0, currentTime - interval))
+            self.seek(to: max(0, self.currentTime - interval))
         }
         nowPlaying.attach(commands)
     }

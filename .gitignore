@@ -14,3 +14,7 @@ DerivedData/
 
 # macOS
 .DS_Store
+
+# Python bytecode from the checkers in Tools/
+__pycache__/
+*.pyc
