@@ -86,6 +86,70 @@ of a mix is read faster than a number, and the data was already being paid for.
 
 ---
 
+## Round 2 — Design
+
+> *You are a world-class product designer at Apple. Review this application's
+> interface design for beauty, restraint, hierarchy, typography, colour, motion and
+> emotional impact. Identify anything generic, unpolished or visually inconsistent.*
+
+Given the eight design renderings in `design/renders/`, the design-system source and
+every screen's code. It found the most embarrassing defect in the project and eight
+smaller ones.
+
+### The one that mattered
+
+**The Mac was shipping in the user's system accent colour.** Every segmented control,
+switch, progress bar, sidebar selection and focus ring rendered in system blue — on
+the one surface whose whole palette exists so that nothing competes with the artwork.
+A producer whose Mac is set to pink had a pink app. One missing `.tint()` at the root
+of the window, and the renderings had not shown it because they were drawn from the
+design system's values rather than from AppKit's.
+
+### Implemented
+
+- **The inspector was a settings form.** A persistent filled box under every value is
+  what makes a pane read as a database record editor rather than as a page about a
+  song. Its own comment claimed it was not one. Now a hairline that lights on focus.
+- **The phone advertised permanently that it is a simulator.** A Stream / Gallery /
+  Motion pill sat under the artwork in all three modes, and Motion's auto-hide hid
+  the transport but left the pill. The mode is a swipe now, with three dots shown for
+  a moment after it changes. The explicit picker belongs on the Mac, where the point
+  is to compare.
+- **The placeholder cover was a grey slab with a 15pt caption.** Every record has one
+  on day one, and day one is the day a producer decides whether this app is for them.
+  It is a cover now: hue derived from the title's hash, the title itself as the mark
+  at 15% of the edge, the credit beneath, and no type at all below 64pt.
+- **Gallery was Stream with sixteen more points of cover** — a spacing variant sold as
+  an environment. It is the sleeve now: running order beside the artwork with the
+  playing track marked, and the credits a release actually carries.
+- **12pt metadata sat at 3.3:1**, under AA, and three places nested further opacity on
+  top of it. The tertiary token was raised and the nested opacities removed.
+- **The grid packed 170pt covers at every window size**, because `adaptive` fills at
+  its minimum; and the card's third line of inventory data turned a shelf into a
+  listing. Wider bounds, one line less.
+- **The Mac preview was a 900pt sheet** that does not fit the laptop most producers
+  own. It is its own window.
+- **One vocabulary.** A mix is a mix — in every menu, sheet, label and button.
+
+### The beat it found missing
+
+A folder became a record silently, with the folder's name, and giving that record its
+first cover was answered with an alert about a filename. Naming is now the first thing
+the cursor is in, and a first cover simply appears — replacing one still asks, because
+that deletes a file.
+
+### Rejected
+
+**"Give the phone a blurred-artwork background behind Now Playing."** This is the
+single most recognisable piece of a competitor's player, and the brief forbids
+reproducing one. The player takes its colour from the artwork's own palette instead.
+
+**"Use a serif display face for release titles."** A record's typography belongs to
+the record, not to the app showing it. Dubplate stays neutral so the artwork does not
+have to argue with it.
+
+---
+
 ## Round 3 — Producer workflow
 
 > *You are a professional record producer who works daily in Pro Tools, Logic and
@@ -219,3 +283,152 @@ for the record to be held offline. Both complaints are satisfied by separating t
 **"Delete `Release.watchFolderBookmark`."** Correct that it is unused. Kept, because
 the alternative is a schema migration on a mirrored store to add one optional
 column later.
+
+---
+
+## Round 5 — Failure testing
+
+> *You are a QA engineer whose entire job is breaking software. Try to break
+> Dubplate. Find crashes, data loss, sync failures, race conditions, playback bugs,
+> file handling errors, edge cases and performance problems.*
+
+The hardest round, and the one that paid for itself several times over. It returned
+twenty-six findings and, unprompted, a numbered fix order: *§0 (it does not compile) →
+F1 (loses masters) → F2/F3 (silently discards and corrupts mixes) → F5 (launch hang on
+any cloud-only phone) → F6/F7/F8 (playback lies and crashes) → the rest.* That order
+was followed exactly.
+
+### §0 — it does not compile
+
+Two compile errors, both introduced by earlier rounds' own fixes and both invisible to
+a project with no compiler: `markDirty()` was called at four sites in `MediaIndex` and
+defined at none, and `SyncCoordinator` assigned to an `isTransferring` property that a
+previous change had deleted. Both were the same mistake — a scripted patch whose
+anchor text had already been altered by an earlier patch in the same script, so the
+replacement silently did nothing.
+
+Fixing them was not enough. `swiftcheck` gained a self-member resolution rule, which
+resolves every `foo(…)` and `self.bar` against the members visible on the enclosing
+type, and it was verified the only way that means anything: by reintroducing each of
+the two errors and confirming the checker names the exact line. It has since caught
+two more of the same class.
+
+### F1 — the path that loses masters
+
+A media descriptor being written to CloudKit was recorded as *uploaded*, which is the
+flag that authorises deleting the local bytes. The description record carries the
+metadata; a separate asset record carries the audio. Uploading the first and unlinking
+the file belonging to the second destroys the only copy of a master.
+
+`isDescribed` and `isUploaded` are now separate facts and only a confirmed asset
+upload sets the second. Beyond that, `removeLocalCopies` no longer trusts the index at
+all: before anything is unlinked it asks CloudKit whether the file record is really
+there, and an index that turns out to be wrong is repaired and reported rather than
+acted on.
+
+### F2 / F3 — the import that discards and corrupts mixes
+
+Import treated a 64 KiB head-plus-tail-plus-size signature as proof that two files
+were the same audio. Two bounces from one session share a WAV header and very often a
+tail of silence, so the signature collides on exactly the files a producer most needs
+told apart — and a colliding file was either discarded as a duplicate or used to
+"repair" a different asset's path.
+
+The signature is now what it should always have been: a cheap candidate filter.
+Identity is decided by reading both files through, and repair additionally requires
+the file size and the original filename to match.
+
+### F5 — launch hang on any phone whose library is still in iCloud
+
+`MediaAnalyser` walked the whole library on the main actor and, when an asset's audio
+was not on the device, recursed straight into the next one without yielding. On a
+phone that had just signed in — every track cloud-only — that is an unbounded
+synchronous walk before the first frame. It now tracks what it skipped, yields on
+every asset including the skipped ones, and reconsiders the skipped ones when a
+download lands.
+
+### F6 – F8, F12, F13 — playback
+
+- **F6.** Reaching a track whose audio had not arrived set `isPlaying = false` and
+  left the engine alone, so the previous track kept playing through the headphones
+  while the interface showed the new one, paused — and pressing play resumed the old
+  track. The engine is stopped before the wait begins.
+- **F7.** `PlaybackEngine.start` tore down the player and the schedule *before* trying
+  to bring the graph up. A failure left `currentItemID` pointing at a track with
+  nothing scheduled and `isPlaying` still true; since seek is built on start, a failed
+  scrub left the transport counting through silence. State is cleared first and set
+  only once the graph is up.
+- **F8.** An unplayable track called `skipUnplayable`, which called
+  `startCurrentItem`, which called `skipUnplayable`. With repeat on and a record whose
+  files were all unreadable, those two called each other around the queue for ever.
+  The controller remembers what it has passed over since the person last asked for
+  something, so every track gets one chance and then the record stops with an error.
+- **F12.** A file whose header promises more audio than it contains renders what it
+  has and stops; `.dataPlayedBack` never fires, because those frames were never played
+  back. The transport counted towards a length that did not exist for as long as the
+  app stayed open. Three seconds of a still playhead while the transport claims to be
+  playing is now the end of that track, and the schedule is rebuilt rather than
+  trusted — whatever was queued behind it was stuck on the same node.
+- **F13.** The engine restarted itself after rebuilding its graph. A rebuild is also
+  what headphones coming out looks like from inside `AVAudioEngine`, and the
+  notification that distinguishes the two arrives separately with no ordering
+  guarantee — so an unreleased record could come out of a phone's own speaker in a
+  room full of people. The engine now always rebuilds silent; the controller decides,
+  and never resumes into the built-in speaker music that was on headphones.
+
+### F9, F10, F11, F24 — silence where there should be a sentence
+
+A download for an asset with no descriptor returned without a word, leaving the row
+saying "Downloading" for the rest of the session. The Mac waited for a download in
+complete silence, looking as though the play button had not registered. Two drops at
+once shared one progress slot, so the first to finish hid the second while it was
+still copying gigabytes. A drop of more than five hundred files was cut off without
+saying so, which is indistinguishable from losing the rest. All four now say what
+happened.
+
+### F14, F21, F23, F25 — the library telling people things that are not true
+
+- `TrackVersion.isCurrent` compared identifiers while `Track.currentVersion` healed
+  itself, so a version deleted on another device left the newest mix listed under
+  *Current* and under *Previous* at once, and nothing in the queue marked as playing.
+- "Nobody has looked yet" was answered as "on this device". The commonest way to reach
+  that state is a catalogue that has arrived from iCloud and audio that has not, so a
+  phone showed play buttons for ten albums it did not have. It answers "not here" now,
+  and the look at the file system happens before the first frame rather than after it.
+- Match keys threw away every character that was not alphanumeric, so a record named
+  with a symbol had no key at all and two bounces of it came in as two separate
+  tracks. Pictographs are kept; arithmetic and currency signs still are not.
+- Playing a named track that has no audio started the record from the top, which reads
+  as a double-click being ignored.
+
+### F15 – F20, F22, F4 — performance and the drop that yanked the record
+
+Planning a drop walked the file system and matched every bounce against every existing
+track — quadratic, on the main actor, inside a drop handler. Setting a cover read its
+dimensions and built its thumbnail on the main actor, so a 12000px export froze the
+window for seconds. A corrupt cover was re-decoded on every pass of the grid, for
+ever. The Lock Screen artwork cache held every release ever played, at full size. The
+scrub bar expanded four hundred stored peaks inside its `body`, so it did that work
+again on every playhead tick and every touch event during a scrub. Every transfer
+starting or finishing spawned its own unordered task to report progress, so a backfill
+produced a thousand of them and the last snapshot to arrive could be a stale one.
+
+Two more: dropping a mix on track 8 while track 3 was playing jumped the record to
+track 8 — through the confirmation sheet it still does, because the sheet says it
+will, but a bare drag no longer does. And an import copies bytes into place before it
+writes the row, so a force quit in between left a file nothing owned; there is a sweep
+at launch now, deliberately conservative — filenames carry the identifier of the asset
+that owns them, a name that is not an identifier is left alone, and a fetch that fails
+skips the sweep rather than reading "no assets" as "delete everything".
+
+### Rejected
+
+**"Add a retry with exponential backoff around every CloudKit call."** `CKSyncEngine`
+and CloudKit's own operations already do this, with the server's rate-limit hints,
+which a hand-rolled loop cannot see. A second layer of retries on top would multiply
+the request rate at exactly the moment the server is asking for less.
+
+**"Checksum every file on launch to detect corruption."** A library is tens of
+gigabytes; hashing all of it at every launch is minutes of disk and battery to detect
+something that has never been observed. The checks were put where corruption actually
+has consequences — at import, and before deleting a local copy.
