@@ -84,7 +84,7 @@ public final class AppServices {
         }
         if mediaStore.exists(relativePath: item.relativePath) {
             player.resumeAfterDownload()
-        } else {
+        } else if player.awaitingDownloadOf?.id == item.id {
             player.abandonPendingItem()
         }
     }

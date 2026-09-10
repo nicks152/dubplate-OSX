@@ -53,6 +53,8 @@ public final class PlayerController {
 
     private var ticker: Task<Void, Never>?
     private var enqueuedItemIDs: Set<UUID> = []
+    /// The item a download was requested for ahead of time, so it is asked for once.
+    private var requestedAheadOf: UUID?
     private var wasPlayingBeforeInterruption = false
     /// Called when a release starts playing, so the library can record it.
     public var didStartRelease: ((UUID) -> Void)?
@@ -285,11 +287,14 @@ public final class PlayerController {
         guard let item = queue.current else { return }
         guard canPlay(item) else {
             // Hold here and ask for the file, rather than skipping past it.
+            let alreadyAsking = awaitingDownloadOf?.id == item.id
             awaitingDownloadOf = item
             isPlaying = false
             stopTicking()
             refreshNowPlaying()
-            needsDownload?(item)
+            if !alreadyAsking {
+                needsDownload?(item)
+            }
             return
         }
         awaitingDownloadOf = nil
@@ -335,7 +340,13 @@ public final class PlayerController {
 
     /// Called once a download lands, to pick up where playback was waiting.
     public func resumeAfterDownload() {
-        guard let waiting = awaitingDownloadOf else { return }
+        requestedAheadOf = nil
+        guard let waiting = awaitingDownloadOf else {
+            // Not stalled — a track further down the record arrived, so it can be
+            // pre-scheduled and the join stays gapless.
+            scheduleNextIfPossible()
+            return
+        }
         guard canPlay(waiting) else { return }
         awaitingDownloadOf = nil
         startCurrentItem(from: 0)
@@ -350,8 +361,20 @@ public final class PlayerController {
     }
 
     /// Schedules the next track on the same node so the transition is sample-exact.
+    ///
+    /// When the next track's audio is not here yet, ask for it now rather than
+    /// waiting until the record reaches it — a partly-downloaded album should play
+    /// through without stopping at the first gap.
     private func scheduleNextIfPossible() {
-        guard let next = queue.next, canPlay(next), !enqueuedItemIDs.contains(next.id) else { return }
+        guard let next = queue.next else { return }
+        guard canPlay(next) else {
+            if !next.relativePath.isEmpty, requestedAheadOf != next.id {
+                requestedAheadOf = next.id
+                needsDownload?(next)
+            }
+            return
+        }
+        guard !enqueuedItemIDs.contains(next.id) else { return }
         let url = mediaStore.url(forRelativePath: next.relativePath)
         do {
             let file = try engine.openFile(at: url)
