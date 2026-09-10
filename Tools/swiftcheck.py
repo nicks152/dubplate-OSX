@@ -286,7 +286,9 @@ def check_type_references(module: Module, modules: dict[str, Module], sources: d
                           allow: set[str], findings: list[Finding]) -> None:
     known = visible_names(module, modules, sources) | allow
     for path in module.files:
-        code = sources[path]
+        # Import lines are validated by check_imports; blank them so a module name
+        # is not mistaken for a type reference.
+        code = IMPORT_RE.sub(lambda m: " " * len(m.group(0)), sources[path])
         local = set()
         for match in GENERIC_PARAM_RE.finditer(code):
             for part in match.group(1).split(","):
