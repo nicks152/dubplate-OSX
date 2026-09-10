@@ -1,0 +1,16 @@
+# Generated test material. Rebuild with:
+#   python3 Tools/make_test_audio.py
+#   python3 Tools/make_placeholder_art.py
+Fixtures/Audio/
+Fixtures/Artwork/
+
+# Xcode
+*.xcuserstate
+xcuserdata/
+DerivedData/
+.build/
+.swiftpm/
+*.xcworkspace/xcuserdata/
+
+# macOS
+.DS_Store

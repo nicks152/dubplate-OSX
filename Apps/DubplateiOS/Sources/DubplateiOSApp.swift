@@ -6,7 +6,7 @@ import DubplateUI
 /// Dubplate for iPhone: the record, out in the world.
 @main
 struct DubplateiOSApp: App {
-    @State private var services = AppServices.live()
+    @State private var services = AppServices.launchConfigured()
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {

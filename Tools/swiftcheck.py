@@ -398,6 +398,9 @@ STYLE_RULES = [
     (re.compile(r"\bfatalError\("), "fatal-error", "warn", "fatalError in shipping code"),
 ]
 FORCE_UNWRAP_RE = re.compile(r"(?<![=!<>+\-*/%&|^\s(,\[{])!(?![=&|])")
+# `var store: LibraryStore!` is an implicitly-unwrapped declaration, not a force
+# unwrap; XCTestCase properties set up in setUp() are written this way by convention.
+IUO_DECLARATION_RE = re.compile(r":\s*[A-Za-z0-9_.<>\[\]?]+!\s*(//.*)?$")
 
 
 def check_style(module: Module, sources: dict[str, str], findings: list[Finding]) -> None:
@@ -416,6 +419,8 @@ def check_style(module: Module, sources: dict[str, str], findings: list[Finding]
         for idx, text in enumerate(code.split("\n"), start=1):
             stripped = text.strip()
             if stripped.startswith("//"):
+                continue
+            if IUO_DECLARATION_RE.search(text):
                 continue
             for match in FORCE_UNWRAP_RE.finditer(text):
                 snippet = text[max(0, match.start() - 24):match.start() + 1].strip()

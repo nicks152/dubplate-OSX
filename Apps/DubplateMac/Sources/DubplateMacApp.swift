@@ -6,7 +6,7 @@ import DubplateUI
 /// Dubplate for Mac: the room where records get made.
 @main
 struct DubplateMacApp: App {
-    @State private var services = AppServices.live()
+    @State private var services = AppServices.launchConfigured()
 
     var body: some Scene {
         WindowGroup {

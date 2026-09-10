@@ -82,6 +82,17 @@ public final class AppServices {
         )
     }
 
+    /// Chooses between the real library and a disposable one.
+    ///
+    /// UI tests must not touch a person's actual records, and a test that depends on
+    /// whatever happens to be in the library is a test that fails on someone else's
+    /// machine. `--dubplate-ui-testing` gives the tests an in-memory store.
+    public static func launchConfigured() -> AppServices {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard arguments.contains("--dubplate-ui-testing") else { return live() }
+        return preview(populated: arguments.contains("--dubplate-sample-library"))
+    }
+
     /// An in-memory library with the three sample records in it, for previews and
     /// for the first launch of a development build.
     public static func preview(populated: Bool = true) -> AppServices {

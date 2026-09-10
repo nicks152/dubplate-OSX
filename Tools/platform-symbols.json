@@ -166,7 +166,9 @@
     "Placeholder",
     "Subview",
     "Context",
-    "AnyClass"
+    "AnyClass",
+    "StaticString",
+    "UInt8Array"
   ],
   "foundation": [
     "AttributedString",
@@ -798,6 +800,30 @@
     "AVPlayerLayer",
     "CALayer",
     "NSRect",
-    "CGColorSpace"
+    "CGColorSpace",
+    "XCTAssert",
+    "XCTAssertEqual",
+    "XCTAssertNotEqual",
+    "XCTAssertTrue",
+    "XCTAssertFalse",
+    "XCTAssertNil",
+    "XCTAssertNotNil",
+    "XCTAssertThrowsError",
+    "XCTAssertNoThrow",
+    "XCTAssertGreaterThan",
+    "XCTAssertLessThan",
+    "XCTAssertGreaterThanOrEqual",
+    "XCTAssertLessThanOrEqual",
+    "XCTFail",
+    "XCTAssertIdentical",
+    "XCTAssertEqualWithAccuracy",
+    "XCTUnwrap",
+    "XCTSkipIf",
+    "XCTSkipUnless",
+    "XCUIDevice",
+    "XCUIApplicationState",
+    "XCUIElementType",
+    "XCTAttachmentLifetime",
+    "XCTContext"
   ]
 }
