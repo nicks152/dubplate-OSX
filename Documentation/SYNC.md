@@ -119,9 +119,29 @@ deletes the thing that owns it.
 
 Deleting a release deletes its tracks and versions by cascade, removes the media
 files, and queues the descriptions and file records for deletion in CloudKit.
-Deleting a *download* is not a deletion: it removes local bytes only, and
-`removeLocalCopies` refuses outright to remove a file that has not been uploaded yet,
-so the button can never destroy the only copy of a mix.
+Deleting a *download* is not a deletion: it removes local bytes only, and it is the
+single most dangerous button in the product, so it is guarded three deep.
+
+**Described is not uploaded.** Two facts are tracked separately in the file index,
+because conflating them is how a master gets destroyed. `isDescribed` means the
+metadata record — filename, checksum, size, path — has reached CloudKit.
+`isUploaded` means the *audio* has. Descriptions routinely arrive on another device
+before the bytes do, and the download path has an explicit case for that. Only a
+confirmed asset upload sets `isUploaded`, and a description record adopted from
+another device claims it only where this device has no copy of its own to upload.
+
+On top of that flag:
+
+1. `removeLocalCopies` refuses outright to remove a file that is not marked uploaded.
+2. It then asks CloudKit whether the file record actually exists, with `desiredKeys:
+   []` so the bytes are not fetched to answer the question. Anything other than a
+   confirmed success — including an error, which cannot confirm anything — keeps the
+   file.
+3. An index that turns out to disagree with CloudKit is corrected and the failure is
+   reported, rather than being treated as the answer.
+
+So the button can never destroy the only copy of a mix, and being wrong about the
+index costs a wasted request rather than a master.
 
 ## Failure
 
