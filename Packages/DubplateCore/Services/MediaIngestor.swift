@@ -96,25 +96,6 @@ public actor MediaIngestor {
         }
     }
 
-    /// Writes raw bytes (from a Photos pick or a paste) into the store.
-    public func ingestArtwork(data: Data, preferredExtension: String) throws -> IngestedFile {
-        let assetID = UUID()
-        let path = store.relativePath(area: .artwork, assetID: assetID, fileExtension: preferredExtension)
-        do {
-            try store.write(data: data, toRelativePath: path)
-        } catch {
-            throw DubplateError(.importFailed, underlying: error)
-        }
-        return IngestedFile(
-            assetID: assetID,
-            relativePath: path,
-            originalFilename: "Artwork.\(preferredExtension)",
-            fileSize: Int64(data.count),
-            checksum: Checksum.of(data),
-            info: AudioFileInfo()
-        )
-    }
-
     public func removeMedia(atRelativePath path: String) {
         try? store.remove(relativePath: path)
     }

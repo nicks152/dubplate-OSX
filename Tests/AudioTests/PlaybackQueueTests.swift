@@ -147,14 +147,6 @@ final class PlaybackQueueTests: XCTestCase {
         XCTAssertEqual(queue.upNext.map(\.title), ["Track 3"])
     }
 
-    func testPlayNextInsertsRightAfterTheCurrentTrack() {
-        var queue = makeQueue(3)
-        let inserted = item(42)
-        queue.playNext(inserted)
-        XCTAssertEqual(queue.upNext.first?.id, inserted.id)
-        XCTAssertEqual(queue.upNext.count, 3)
-    }
-
     /// Shuffle has one implementation; the test injects a generator rather than
     /// exercising a second copy of the logic.
     func testShuffleIsDeterministicWithAFixedGenerator() {

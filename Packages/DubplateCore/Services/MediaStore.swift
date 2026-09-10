@@ -120,16 +120,6 @@ public struct MediaStore: Sendable {
         return (assetID, path, size)
     }
 
-    /// Writes bytes that arrived from the cloud into the place an asset expects.
-    public func write(data: Data, toRelativePath path: String) throws {
-        let destination = url(forRelativePath: path)
-        try fileManager.createDirectory(
-            at: destination.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        try data.write(to: destination, options: .atomic)
-    }
-
     /// Moves a downloaded temporary file into place.
     public func adopt(temporaryFile: URL, asRelativePath path: String) throws {
         let destination = url(forRelativePath: path)

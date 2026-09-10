@@ -206,21 +206,6 @@ public struct PlaybackQueue: Sendable {
         items[index] = item
     }
 
-    /// Puts an item directly after the current one.
-    public mutating func playNext(_ item: PlaybackQueueItem) {
-        guard let position = currentPosition else {
-            set([item])
-            return
-        }
-        items.append(item)
-        order.insert(items.count - 1, at: position + 1)
-    }
-
-    public mutating func append(_ item: PlaybackQueueItem) {
-        items.append(item)
-        order.append(items.count - 1)
-    }
-
     /// One implementation, with an injectable generator so a test can be
     /// deterministic without a second copy of the logic to drift from it.
     private mutating func rebuildOrder() {

@@ -37,10 +37,6 @@ public enum Checksum {
         return digestString(hasher.finalize())
     }
 
-    public static func of(_ data: Data) -> String {
-        digestString(SHA256.hash(data: data))
-    }
-
     public static func fileSize(of url: URL) throws -> Int64 {
         let values = try url.resourceValues(forKeys: [.fileSizeKey])
         return Int64(values.fileSize ?? 0)
