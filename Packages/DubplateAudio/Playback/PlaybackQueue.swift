@@ -21,6 +21,8 @@ public struct PlaybackQueueItem: Identifiable, Hashable, Sendable {
     /// Shared between every item of a release, so this costs one allocation.
     public let artworkThumbnail: Data?
     public let canvasRelativePath: String?
+    /// 400 bytes of peak data for the scrubber, when the file has been measured.
+    public let waveformPeaks: Data?
 
     public init(
         id: UUID = UUID(),
@@ -37,7 +39,8 @@ public struct PlaybackQueueItem: Identifiable, Hashable, Sendable {
         format: AudioFormatDescription,
         availability: AvailabilityState,
         artworkThumbnail: Data? = nil,
-        canvasRelativePath: String? = nil
+        canvasRelativePath: String? = nil,
+        waveformPeaks: Data? = nil
     ) {
         self.id = id
         self.trackID = trackID
@@ -54,6 +57,7 @@ public struct PlaybackQueueItem: Identifiable, Hashable, Sendable {
         self.availability = availability
         self.artworkThumbnail = artworkThumbnail
         self.canvasRelativePath = canvasRelativePath
+        self.waveformPeaks = waveformPeaks
     }
 
     public var isPlayable: Bool {

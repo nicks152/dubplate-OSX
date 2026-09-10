@@ -150,6 +150,22 @@ final class PlaybackQueueTests: XCTestCase {
         XCTAssertNil(queue.current)
     }
 
+    /// The waveform is measured in the background and stored on the asset; if it
+    /// does not travel on the queue item it is never drawn, which is exactly what
+    /// happened the first time.
+    func testQueueItemsCarryTheWaveform() {
+        let peaks = Data(repeating: 128, count: 400)
+        let withWaveform = PlaybackQueueItem(
+            trackID: UUID(), versionID: UUID(), assetID: UUID(),
+            relativePath: "Audio/00/a.wav", title: "Midnight", artistName: "A",
+            releaseTitle: "NO SIGNAL", releaseID: UUID(), trackNumber: 1,
+            duration: 200, format: .unknown, availability: .available,
+            waveformPeaks: peaks
+        )
+        XCTAssertEqual(withWaveform.waveformPeaks?.count, 400)
+        XCTAssertEqual(WaveformGenerator.heights(from: peaks).count, 400)
+    }
+
     func testUnplayableItemsAreFlagged() {
         let missing = PlaybackQueueItem(
             trackID: UUID(), versionID: UUID(), assetID: UUID(), relativePath: "",

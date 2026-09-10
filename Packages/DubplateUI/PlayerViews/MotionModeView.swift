@@ -65,6 +65,7 @@ public struct MotionModeView: View {
                             progress: player.progress,
                             elapsed: player.displayTime,
                             duration: player.duration,
+                            peaks: player.currentItem?.waveformPeaks,
                             tint: .white,
                             onScrubStart: { player.beginScrub(at: $0) },
                             onScrubChange: { player.updateScrub(to: $0) },

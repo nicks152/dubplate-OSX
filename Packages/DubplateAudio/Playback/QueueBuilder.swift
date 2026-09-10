@@ -43,7 +43,8 @@ public enum QueueBuilder {
             format: asset.format,
             availability: asset.availability,
             artworkThumbnail: artworkThumbnail ?? release?.artwork?.thumbnailData,
-            canvasRelativePath: track.canvas?.relativePath
+            canvasRelativePath: track.canvas?.relativePath,
+            waveformPeaks: asset.waveformPeaks
         )
     }
 
