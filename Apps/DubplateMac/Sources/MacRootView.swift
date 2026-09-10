@@ -171,7 +171,7 @@ struct MacRootView: View {
             await library.setArtwork(from: artworkURL, for: release)
         }
         if !result.audioURLs.isEmpty {
-            let plan = library.plan(for: result.audioURLs, in: release)
+            let plan = await library.plan(for: result.audioURLs, in: release)
             let outcome = await library.apply(plan, to: release)
             services.report(outcome)
         }

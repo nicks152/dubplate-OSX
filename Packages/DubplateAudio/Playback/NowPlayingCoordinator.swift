@@ -29,7 +29,15 @@ public final class NowPlayingCoordinator {
         public init() {}
     }
 
+    /// Decoded Lock Screen covers, newest last.
+    ///
+    /// Bounded: each entry holds a full-size image, and a listening session that
+    /// moves through thirty records used to keep thirty of them alive for as long
+    /// as the app ran. Four is enough that stepping back and forth between two
+    /// records never re-decodes.
     private var artworkCache: [UUID: MPMediaItemArtwork] = [:]
+    private var artworkOrder: [UUID] = []
+    private static let artworkCacheLimit = 4
     private var lastItemID: UUID?
 
     public init() {}
@@ -161,15 +169,22 @@ public final class NowPlayingCoordinator {
 
         let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
         artworkCache[item.releaseID] = artwork
+        artworkOrder.removeAll { $0 == item.releaseID }
+        artworkOrder.append(item.releaseID)
+        while artworkOrder.count > Self.artworkCacheLimit {
+            artworkCache[artworkOrder.removeFirst()] = nil
+        }
         return artwork
     }
 
     /// Drops cached artwork for a release whose cover changed.
     public func invalidateArtwork(releaseID: UUID) {
         artworkCache[releaseID] = nil
+        artworkOrder.removeAll { $0 == releaseID }
     }
 
     public func invalidateAllArtwork() {
         artworkCache.removeAll()
+        artworkOrder.removeAll()
     }
 }

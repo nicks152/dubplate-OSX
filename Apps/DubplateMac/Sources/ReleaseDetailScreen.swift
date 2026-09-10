@@ -368,11 +368,16 @@ struct ReleaseDetailScreen: View {
             }
         }
         if !audio.isEmpty || !videos.isEmpty {
-            let plan = library.plan(for: audio + videos, in: release)
-            if ImportPlanSheet.requiresConfirmation(plan) {
-                pendingPlan = IdentifiedPlan(plan)
-            } else {
-                Task { await apply(plan) }
+            // Planning walks the drop and matches every bounce against the record,
+            // so it happens off the main actor and the sheet appears when it is
+            // ready. A drop handler has to answer immediately either way.
+            Task {
+                let plan = await library.plan(for: audio + videos, in: release)
+                if ImportPlanSheet.requiresConfirmation(plan) {
+                    pendingPlan = IdentifiedPlan(plan)
+                } else {
+                    await apply(plan)
+                }
             }
         }
         return true

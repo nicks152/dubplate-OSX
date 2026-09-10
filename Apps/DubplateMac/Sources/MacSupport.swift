@@ -125,7 +125,7 @@ struct InboxScreen: View {
             let audio = urls.filter { FilenameParser.isAudio($0.lastPathComponent) }
             guard !audio.isEmpty else { return false }
             Task {
-                let plan = library.plan(for: audio, in: nil)
+                let plan = await library.plan(for: audio, in: nil)
                 await library.apply(plan, to: nil)
                 await services.registerNewMedia(in: nil)
             }

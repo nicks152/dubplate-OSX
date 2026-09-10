@@ -74,17 +74,28 @@ extension LibraryStore {
     ///
     /// Folders are walked first: a bounce folder is the most obvious thing to drag
     /// in, and a handler that only understands loose files refuses it silently.
-    public func plan(for urls: [URL], in release: Release?) -> ImportPlan {
-        let expansion = DroppedFiles.expanded(urls)
-        let candidates = expansion.files.enumerated().map { ImportCandidate.make(url: $1, dropIndex: $0) }
+    ///
+    /// Off the main actor, all of it. Walking the folders touches the file system
+    /// once per entry, and matching every dropped bounce against every track
+    /// already on the record is quadratic — on a dropped archive of a few hundred
+    /// files that was a visibly frozen window before a single note had been heard.
+    /// Only the summaries, which read the model, are gathered here.
+    public func plan(for urls: [URL], in release: Release?) async -> ImportPlan {
         let existing = release.map { summaries(for: $0) } ?? []
-        var plan = ImportPlanner.plan(
-            candidates: candidates,
-            existingTracks: existing,
-            nextTrackNumber: (release?.trackCount ?? 0) + 1
-        )
-        plan.wasTruncated = expansion.wasTruncated
-        return plan
+        let nextNumber = (release?.trackCount ?? 0) + 1
+        return await Task.detached(priority: .userInitiated) {
+            let expansion = DroppedFiles.expanded(urls)
+            let candidates = expansion.files.enumerated().map {
+                ImportCandidate.make(url: $1, dropIndex: $0)
+            }
+            var plan = ImportPlanner.plan(
+                candidates: candidates,
+                existingTracks: existing,
+                nextTrackNumber: nextNumber
+            )
+            plan.wasTruncated = expansion.wasTruncated
+            return plan
+        }.value
     }
 
     public func summaries(for release: Release) -> [TrackSummary] {
@@ -222,95 +233,6 @@ extension LibraryStore {
         }
         save()
         return outcome
-    }
-
-    // MARK: - Artwork
-
-    public func setArtwork(from url: URL, for release: Release) async {
-        do {
-            let ingested = try await ingestor.ingestArtwork(from: url)
-            let destination = mediaStore.url(forRelativePath: ingested.relativePath)
-            let size = ImageInspector.pixelSize(ofFileAt: destination)
-            let asset = ArtworkAsset(
-                id: ingested.assetID,
-                kind: .staticArtwork,
-                filename: destination.lastPathComponent,
-                originalFilename: ingested.originalFilename,
-                relativePath: ingested.relativePath,
-                width: size.width,
-                height: size.height,
-                fileSize: ingested.fileSize,
-                checksum: ingested.checksum
-            )
-            asset.thumbnailData = ImageInspector.thumbnailData(ofFileAt: destination)
-            context.insert(asset)
-            if let previous = release.artwork {
-                await ingestor.removeMedia(atRelativePath: previous.relativePath)
-                context.delete(previous)
-            }
-            release.artwork = asset
-            release.updatedAt = Date()
-            save()
-            artworkDidChange?(release.id)
-        } catch let error as DubplateError {
-            lastError = error
-        } catch {
-            lastError = DubplateError(.artworkUnreadable, subject: url.lastPathComponent, underlying: error)
-        }
-    }
-
-    public func setAnimatedArtwork(from url: URL, for release: Release) async {
-        do {
-            let ingested = try await ingestor.ingestArtwork(from: url)
-            let asset = ArtworkAsset(
-                id: ingested.assetID,
-                kind: .animatedArtwork,
-                filename: mediaStore.url(forRelativePath: ingested.relativePath).lastPathComponent,
-                originalFilename: ingested.originalFilename,
-                relativePath: ingested.relativePath,
-                fileSize: ingested.fileSize,
-                checksum: ingested.checksum
-            )
-            context.insert(asset)
-            if let previous = release.animatedArtwork {
-                await ingestor.removeMedia(atRelativePath: previous.relativePath)
-                context.delete(previous)
-            }
-            release.animatedArtwork = asset
-            release.updatedAt = Date()
-            save()
-        } catch let error as DubplateError {
-            lastError = error
-        } catch {
-            lastError = DubplateError(.importFailed, subject: url.lastPathComponent, underlying: error)
-        }
-    }
-
-    public func setCanvas(from url: URL, for track: Track) async {
-        do {
-            let ingested = try await ingestor.ingestArtwork(from: url)
-            let asset = ArtworkAsset(
-                id: ingested.assetID,
-                kind: .trackVideo,
-                filename: mediaStore.url(forRelativePath: ingested.relativePath).lastPathComponent,
-                originalFilename: ingested.originalFilename,
-                relativePath: ingested.relativePath,
-                fileSize: ingested.fileSize,
-                checksum: ingested.checksum
-            )
-            context.insert(asset)
-            if let previous = track.canvas {
-                await ingestor.removeMedia(atRelativePath: previous.relativePath)
-                context.delete(previous)
-            }
-            track.canvas = asset
-            track.updatedAt = Date()
-            save()
-        } catch let error as DubplateError {
-            lastError = error
-        } catch {
-            lastError = DubplateError(.importFailed, subject: url.lastPathComponent, underlying: error)
-        }
     }
 
     // MARK: - Building blocks

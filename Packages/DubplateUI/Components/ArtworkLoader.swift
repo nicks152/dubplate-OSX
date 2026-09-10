@@ -13,6 +13,13 @@ public final class ArtworkLoader {
     private let mediaStore: MediaStore
     private let cache = NSCache<NSString, DubplateImage>()
     private var inFlight: [String: Task<DubplateImage?, Never>] = [:]
+    /// Paths whose bytes are on this device and will not decode.
+    ///
+    /// Without this a corrupt or truncated cover was re-decoded on every pass of
+    /// the grid — ImageIO failing over and over, for the life of the session, at
+    /// scroll rate. Cleared whenever the artwork is replaced. A file that is
+    /// merely absent is never recorded here: it will decode once it arrives.
+    private var undecodable: Set<String> = []
 
     public init(mediaStore: MediaStore) {
         self.mediaStore = mediaStore
@@ -29,14 +36,24 @@ public final class ArtworkLoader {
         return cache.object(forKey: key(asset.relativePath, edge) as NSString)
     }
 
+    /// Whether asking again could only fail again. Views use it to go straight to
+    /// the monogram instead of holding a spinner over a file that is never coming.
+    public func isUndecodable(_ asset: ArtworkAsset?) -> Bool {
+        guard let asset else { return false }
+        return undecodable.contains(asset.relativePath)
+    }
+
     public func image(for asset: ArtworkAsset?, edge: CGFloat) async -> DubplateImage? {
         guard let asset, !asset.relativePath.isEmpty else { return nil }
+        guard !undecodable.contains(asset.relativePath) else { return nil }
         let cacheKey = key(asset.relativePath, edge)
         if let cached = cache.object(forKey: cacheKey as NSString) { return cached }
 
         if let existing = inFlight[cacheKey] { return await existing.value }
 
-        let url = mediaStore.url(forRelativePath: asset.relativePath)
+        let path = asset.relativePath
+        let url = mediaStore.url(forRelativePath: path)
+        let bytesAreHere = mediaStore.exists(relativePath: path)
         let thumbnail = asset.thumbnailData
         let maxPixel = Int(edge * displayScale)
 
@@ -58,18 +75,24 @@ public final class ArtworkLoader {
         inFlight[cacheKey] = nil
         if let image {
             cache.setObject(image, forKey: cacheKey as NSString, cost: cost(of: image))
+        } else if bytesAreHere {
+            // The file is here and neither it nor its thumbnail decoded. Trying
+            // again on the next scroll pass would fail in exactly the same way.
+            undecodable.insert(path)
         }
         return image
     }
 
     /// Drops cached renditions of one asset, after its artwork is replaced.
     public func invalidate(relativePath: String) {
+        undecodable.remove(relativePath)
         for edge in Self.commonEdges {
             cache.removeObject(forKey: key(relativePath, edge) as NSString)
         }
     }
 
     public func invalidateAll() {
+        undecodable.removeAll()
         cache.removeAllObjects()
     }
 

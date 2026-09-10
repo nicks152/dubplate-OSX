@@ -94,7 +94,7 @@ struct MacLibraryScreen: View {
             artistName: library.defaultArtistName,
             type: ReleaseType.inferred(fromTrackCount: urls.count)
         )
-        let plan = library.plan(for: urls, in: release)
+        let plan = await library.plan(for: urls, in: release)
         let outcome = await library.apply(plan, to: release)
         services.report(outcome)
         await services.registerNewMedia(in: release)

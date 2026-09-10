@@ -18,6 +18,12 @@ public struct ScrubBar: View {
     private let onScrubEnd: () -> Void
 
     @State private var isScrubbing = false
+    /// Peak bytes expanded to bar heights, once per waveform rather than once per
+    /// frame. The bar redraws several times a second while a record plays and on
+    /// every touch event while a finger is on it; decoding four hundred peaks
+    /// inside `body` meant doing that work sixty times a second to draw the same
+    /// shape.
+    @State private var heights: [Double] = []
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     public init(
@@ -67,6 +73,9 @@ public struct ScrubBar: View {
             .font(DubplateType.metadata)
             .foregroundStyle(tint.opacity(0.55))
         }
+        .task(id: peaks) {
+            heights = peaks.map { WaveformGenerator.heights(from: $0) } ?? []
+        }
         .accessibilityElement()
         .accessibilityLabel("Playback position")
         .accessibilityValue("\(Formatting.duration(elapsed)) of \(Formatting.duration(duration))")
@@ -82,15 +91,14 @@ public struct ScrubBar: View {
     }
 
     private var barHeight: CGFloat {
-        peaks?.isEmpty == false ? (isScrubbing ? 34 : 26) : (isScrubbing ? 6 : 4)
+        heights.isEmpty ? (isScrubbing ? 6 : 4) : (isScrubbing ? 34 : 26)
     }
 
     @ViewBuilder
     private func track(width: CGFloat, filled: Bool) -> some View {
         let color = filled ? tint : tint.opacity(0.22)
-        if let peaks, !peaks.isEmpty {
-            WaveformShape(heights: WaveformGenerator.heights(from: peaks))
-                .fill(color)
+        if !heights.isEmpty {
+            WaveformShape(heights: heights).fill(color)
         } else {
             Capsule().fill(color)
         }
