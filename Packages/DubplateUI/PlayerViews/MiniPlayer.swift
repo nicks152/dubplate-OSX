@@ -35,9 +35,10 @@ public struct MiniPlayer: View {
                 .background(background)
                 .overlay(alignment: .top) {
                     if style == .bar {
-                        Rectangle()
-                            .fill(DubplateColor.hairline)
-                            .frame(height: DubplateLayout.hairline)
+                        // The Mac has no other scrubber outside the phone preview,
+                        // and a producer listening back to a mix needs to get to
+                        // 2:14 without opening anything.
+                        SlimScrubber(player: player)
                     }
                 }
                 .overlay(alignment: .bottom) {
@@ -110,5 +111,63 @@ public struct MiniPlayer: View {
 
     private var secondaryTextColor: Color {
         style == .bar ? DubplateColor.tertiaryText : DubplateColor.playerSecondaryText
+    }
+}
+
+/// A hairline across the top of the Mac's player bar that is also the scrubber.
+///
+/// Two points tall until the pointer is near it, then six. It replaces the hairline
+/// rather than sitting next to it, so the bar does not grow a control.
+struct SlimScrubber: View {
+    let player: PlayerController
+
+    @State private var isHovering = false
+    @State private var isScrubbing = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .leading) {
+                Rectangle().fill(DubplateColor.hairline)
+                Rectangle()
+                    .fill(DubplateColor.primaryText.opacity(isHovering || isScrubbing ? 0.9 : 0.45))
+                    .frame(width: max(0, geometry.size.width * player.progress))
+            }
+            .frame(height: isHovering || isScrubbing ? 6 : 2)
+            .frame(height: 14, alignment: .top)
+            .contentShape(Rectangle())
+            .onHover { isHovering = $0 }
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        guard geometry.size.width > 0, player.duration > 0 else { return }
+                        let fraction = min(max(0, value.location.x / geometry.size.width), 1)
+                        let time = Double(fraction) * player.duration
+                        if isScrubbing {
+                            player.updateScrub(to: time)
+                        } else {
+                            isScrubbing = true
+                            player.beginScrub(at: time)
+                        }
+                    }
+                    .onEnded { _ in
+                        isScrubbing = false
+                        player.endScrub()
+                    }
+            )
+        }
+        .frame(height: 14)
+        .animation(DubplateMotion.respecting(reduceMotion, DubplateMotion.quick), value: isHovering)
+        .accessibilityElement()
+        .accessibilityLabel("Playback position")
+        .accessibilityValue("\(Formatting.duration(player.displayTime)) of \(Formatting.duration(player.duration))")
+        .accessibilityAdjustableAction { direction in
+            let step: TimeInterval = 15
+            switch direction {
+            case .increment: player.seek(to: player.currentTime + step)
+            case .decrement: player.seek(to: max(0, player.currentTime - step))
+            @unknown default: break
+            }
+        }
     }
 }
