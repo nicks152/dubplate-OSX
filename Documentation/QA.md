@@ -10,16 +10,19 @@ What *has* been run, and what it establishes:
 
 | Check | Result | What it establishes |
 | --- | --- | --- |
-| `python3 Tools/swiftcheck.py` | 105 files, 14,800 lines, **0 errors, 0 warnings** | Delimiters balance; no duplicate declarations; every import matches a declared dependency; ~2,000 capitalised identifiers all resolve to a declaration in scope or a reviewed platform symbol; every `@Model` obeys CloudKit's rules, including that every relationship has an inverse; every `@Environment` read has a matching injection in each application; no force unwraps, `try!`, `as!`, `print(`, or oversized files |
-| `python3 Tools/pbxcheck.py` | 93 objects, 4 targets, **0 problems** | The Xcode project parses as an OpenStep plist; every object reference resolves; every file reference exists on disk; every target has a sources phase and compiles at least one file |
+| `python3 Tools/swiftcheck.py` | 108 files, 16,119 lines, **0 errors, 0 warnings** | Delimiters balance; no duplicate declarations; every import matches a declared dependency; ~2,000 capitalised identifiers all resolve to a declaration in scope or a reviewed platform symbol; every `@Model` obeys CloudKit's rules, including that every relationship has an inverse; every `@Environment` read has a matching injection in each application; no force unwraps, `try!`, `as!`, `print(`, or oversized files |
+| `python3 Tools/pbxcheck.py` | 95 objects, 4 targets, **0 problems** | The Xcode project parses as an OpenStep plist; every object reference resolves; every file reference exists on disk; every target has a sources phase and compiles at least one file |
 | `python3 Tools/heuristics_reference.py` | **35/35 cases pass** | The filename and version-matching rules behave as intended on a table of real bounce names |
 | BS.1770 coefficients, checked numerically | max error 4e-14 vs the published 48 kHz values | The K-weighting filters are correct, so loudness numbers are not all wrong by a constant |
 | Gapless fixture continuity | boundary step 0.028782 vs 0.028794 max in-file | The two halves of the test tone join with no discontinuity, so a click at a track boundary would be the player's fault |
 | WAV fixtures re-parsed with Python's `wave` | all 8 valid | The synthetic audio is well-formed at every rate and depth |
 
-Two of these checks were verified the only way a check can be: by deliberately
+Three of these checks were verified the only way a check can be: by deliberately
 breaking the code — deleting an `.environment()` injection, removing a relationship's
-`inverse:` — and confirming the checker named the exact line that would have failed.
+`inverse:`, calling a method that does not exist — and confirming the checker named
+the exact line that would have failed. The last of those was added because critic
+round 5 found two real compile errors that nothing here would have caught; it has
+since caught two more of the same kind.
 
 **What that does not establish:** that it compiles. `swiftcheck.py` cannot type-check
 an expression, resolve an overload, or know whether a SwiftUI modifier exists on the
@@ -96,6 +99,15 @@ concern in the design, not from a checklist.
 - Switch version mid-track and confirm the position holds.
 - Switch version of a track that is *not* playing and confirm the queue updates.
 - Delete the version that is currently playing.
+- Play a record whose audio is still in iCloud: it holds and says so, and the track
+  that *was* playing stops rather than continuing under a paused interface.
+- Play a record where every file is unreadable, with repeat on: it stops with an
+  error after one pass rather than cycling.
+- Play a truncated WAV — one whose header promises more than the file holds. It
+  should move on after about three seconds, not count to a length that is not there.
+- Pause for a minute, then press play. It must resume, not skip.
+- Unplug headphones at the exact moment of a track change.
+- Drop a new mix onto track 8 while track 3 is playing: track 3 keeps playing.
 
 ### System integration
 - Lock screen: artwork, all four text fields, scrub, next, previous.

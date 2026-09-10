@@ -57,6 +57,11 @@ extension PlayerController {
     // MARK: - Ticking
 
     func startTicking() {
+        // The stall watch starts from now, not from wherever the playhead was when
+        // the ticker last stopped. Without this, pausing for longer than the stall
+        // timeout and then pressing play declared the track stalled on the first
+        // tick and skipped it.
+        lastAdvance = nil
         guard ticker == nil else { return }
         ticker = Task { [weak self] in
             while !Task.isCancelled {

@@ -118,4 +118,53 @@ final class MediaStoreTests: XCTestCase {
 
         XCTAssertTrue(DroppedFiles.expand([project]).isEmpty)
     }
+
+
+    /// A drop that hits the limit has to say so. Importing 2 of 5 in silence is
+    /// indistinguishable from losing the other three.
+    func testTruncatedDropReportsItself() throws {
+        let folder = URL.temporaryDirectory.appending(path: "Drop-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        for index in 1...5 {
+            try Data([0, 1]).write(to: folder.appending(path: "0\(index) Take.wav"))
+        }
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let full = DroppedFiles.expanded([folder])
+        XCTAssertEqual(full.files.count, 5)
+        XCTAssertFalse(full.wasTruncated)
+
+        let clipped = DroppedFiles.expanded([folder], limit: 2)
+        XCTAssertEqual(clipped.files.count, 2)
+        XCTAssertTrue(clipped.wasTruncated)
+    }
+
+    /// Bytes an interrupted import left behind are swept; anything an asset still
+    /// refers to, and anything whose name is not an asset identifier, is not.
+    func testUnreferencedMediaIsSweptAndTheRestIsNot() throws {
+        let root = URL.temporaryDirectory.appending(path: "Sweep-\(UUID().uuidString)")
+        let store = MediaStore(root: root)
+        try store.prepare()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let kept = UUID()
+        let orphan = UUID()
+        let keptPath = store.relativePath(area: .audio, assetID: kept, fileExtension: "wav")
+        let orphanPath = store.relativePath(area: .audio, assetID: orphan, fileExtension: "wav")
+        for path in [keptPath, orphanPath] {
+            let url = store.url(forRelativePath: path)
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try Data([0, 1]).write(to: url)
+        }
+        let stranger = root.appending(path: "Audio/notes.txt")
+        try Data([0]).write(to: stranger)
+
+        XCTAssertEqual(store.removeMedia(notReferencedBy: [kept]), 1)
+        XCTAssertTrue(store.exists(relativePath: keptPath))
+        XCTAssertFalse(store.exists(relativePath: orphanPath))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: stranger.path(percentEncoded: false)))
+    }
 }

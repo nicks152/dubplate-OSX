@@ -337,7 +337,6 @@ public final class PlayerController {
             try engine.start(item: item.id, file: file, at: offset)
             isPlaying = true
             currentTime = offset
-            lastAdvance = nil
             wasPlayingOnExternalRoute = !session.isRoutedToBuiltInSpeaker
             skippedSinceUserAction.removeAll()
             enqueuedItemIDs = [item.id]

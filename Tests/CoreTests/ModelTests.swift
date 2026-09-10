@@ -161,4 +161,41 @@ final class ModelTests: XCTestCase {
             format.isGaplessCompatible(with: AudioFormatDescription(sampleRate: 96_000, bitDepth: 24, channelCount: 2, codec: "WAV"))
         )
     }
+
+
+    /// `isCurrent` has to agree with `currentVersion`, which heals itself when the
+    /// identifier points at a version another device deleted. When they disagreed,
+    /// the newest mix was listed as current *and* as previous.
+    func testIsCurrentAgreesWithTheHealedCurrentVersion() {
+        let track = Track(title: "Midnight")
+        let first = TrackVersion(versionNumber: 1)
+        let second = TrackVersion(versionNumber: 2)
+        first.track = track
+        second.track = track
+        track.versions = [first, second]
+        track.currentVersionID = nil
+
+        XCTAssertEqual(track.currentVersion?.id, second.id)
+        XCTAssertTrue(second.isCurrent)
+        XCTAssertFalse(first.isCurrent)
+
+        track.makeCurrent(first)
+        XCTAssertTrue(first.isCurrent)
+        XCTAssertFalse(second.isCurrent)
+    }
+
+    /// Nobody having looked yet is not the same as the file being here. The
+    /// commonest way to reach it is a catalogue that arrived from iCloud without
+    /// its audio.
+    func testUninspectedAudioIsNotClaimedToBeHere() {
+        let asset = AudioAsset(filename: "a.wav", relativePath: "Audio/00/a.wav")
+        asset.localPresence = nil
+        XCTAssertEqual(asset.availability, .cloudOnly)
+
+        asset.localPresence = true
+        XCTAssertEqual(asset.availability, .available)
+
+        asset.transferState = .downloading
+        XCTAssertEqual(asset.availability, .downloading)
+    }
 }

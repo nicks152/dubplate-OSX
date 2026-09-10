@@ -135,4 +135,17 @@ final class FilenameParserTests: XCTestCase {
         XCTAssertEqual(FilenameParser.parse("((((.wav").title, "(((")
         XCTAssertEqual(FilenameParser.parse("04   Midnight   v5.wav").title, "Midnight")
     }
+
+
+    /// A record named with a symbol still has to have a match key, or two bounces
+    /// of it arrive as two separate tracks.
+    func testPictographTitlesKeepAMatchKey() {
+        let one = FilenameParser.parse("🔥 mix 1.wav")
+        let two = FilenameParser.parse("🔥 mix 2.wav")
+        XCTAssertFalse(one.matchKey.isEmpty)
+        XCTAssertEqual(one.matchKey, two.matchKey)
+        XCTAssertEqual(FilenameParser.normalize("Dust — Storm!"), "duststorm")
+        // Arithmetic and currency signs are still dropped, as they always were.
+        XCTAssertEqual(FilenameParser.normalize("A + B"), "ab")
+    }
 }
