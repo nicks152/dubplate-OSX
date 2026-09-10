@@ -119,7 +119,10 @@ public final class ArtworkLoader {
     }
 
     private func bucket(for edge: CGFloat) -> Int {
-        Self.commonEdges.first { edge <= $0 } ?? Self.commonEdges.last ?? 512
+        let chosen = Self.commonEdges.first { edge <= $0 } ?? Self.commonEdges.last ?? 512
+        // Int, so the cache key reads "…@512" rather than "…@512.0" — and so two
+        // requests a hair apart in points cannot land on different keys.
+        return Int(chosen)
     }
 
     private static let commonEdges: [CGFloat] = [64, 128, 256, 512, 1024, 2048]

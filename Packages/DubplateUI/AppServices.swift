@@ -139,15 +139,18 @@ public final class AppServices {
         case .transferFailed, .iCloudUnavailable:
             return { [weak self] in
                 guard let self else { return }
-                clearErrors()
-                Task { await sync.syncNow() }
+                self.clearErrors()
+                // `self.` spelled out inside the nested Task: `guard let self`
+                // unwraps it for this closure, not for another escaping closure
+                // created inside it.
+                Task { await self.sync.syncNow() }
             }
         case .notDownloadedYet:
             return { [weak self] in
                 guard let self else { return }
-                clearErrors()
-                downloadBlockedByCellular = false
-                retryPendingDownload()
+                self.clearErrors()
+                self.downloadBlockedByCellular = false
+                self.retryPendingDownload()
             }
         default:
             return nil
