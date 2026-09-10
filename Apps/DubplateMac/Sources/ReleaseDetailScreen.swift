@@ -121,7 +121,7 @@ struct ReleaseDetailScreen: View {
             Text("Deleted from this Mac and from iCloud. This can’t be undone.")
         }
         .alert("Rename Mix", isPresented: Binding(get: { renamingVersion != nil }, set: { if !$0 { renamingVersion = nil } })) {
-            TextField("Label", text: $draftText)
+            TextField("Vocal up, less sub", text: $draftText)
             Button("Cancel", role: .cancel) { renamingVersion = nil }
             Button("Save") {
                 if let version = renamingVersion { library.rename(version: version, to: draftText) }

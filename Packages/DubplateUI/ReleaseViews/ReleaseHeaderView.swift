@@ -149,6 +149,7 @@ public struct ReleaseHeaderView: View {
             }
         }
         .multilineTextAlignment(alignment == .center ? .center : .leading)
+        .publishesTextEditing(focusedField != nil)
         .onChange(of: focusedField) { _, newValue in
             if newValue == nil { commit() }
         }

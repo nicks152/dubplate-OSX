@@ -40,6 +40,7 @@ public struct TrackInspectorView: View {
             .padding(DubplateLayout.xl)
         }
         .background(DubplateColor.raised)
+        .publishesTextEditing(focusedField != nil)
         .onChange(of: focusedField) { _, newValue in
             if newValue == nil { onCommit() }
         }

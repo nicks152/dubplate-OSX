@@ -76,6 +76,9 @@ enum DubplateWindow {
 struct DubplateCommands: Commands {
     let services: AppServices
     @FocusedValue(\.selectedRelease) private var selectedRelease
+    @FocusedValue(\.isEditingText) private var isEditingTextValue
+
+    private var isEditingText: Bool { isEditingTextValue ?? false }
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
@@ -97,14 +100,16 @@ struct DubplateCommands: Commands {
         }
 
         CommandMenu("Playback") {
-            // ⌥Space, not bare Space. AppKit consults the main menu's key
-            // equivalents before the field editor, so a bare Space here would
-            // toggle playback while someone is typing a release title.
+            // Space, the transport key every music application uses — but
+            // disabled while a text field has focus. AppKit offers a menu's key
+            // equivalents before the field editor, so an enabled item here would
+            // eat the space bar in the middle of a release title; a disabled one
+            // lets the keystroke through to the field.
             Button(services.player.isPlaying ? "Pause" : "Play") {
                 services.player.togglePlayPause()
             }
-            .keyboardShortcut(.space, modifiers: .option)
-            .disabled(services.player.currentItem == nil)
+            .keyboardShortcut(.space, modifiers: [])
+            .disabled(isEditingText || services.player.currentItem == nil)
 
             Button("Next Track") { services.player.next() }
                 .keyboardShortcut(.rightArrow, modifiers: .command)
